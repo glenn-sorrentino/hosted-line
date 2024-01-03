@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Register</title>
+    <title>Login</title>
 </head>
 <body>
-    <h1>Register</h1>
-    <form method="POST" action="/register">
+    <h1>Login</h1>
+    <form method="POST" action="/login">
         <div>
             <label for="username">Username:</label>
             <input type="text" id="username" name="username" required>
@@ -15,8 +15,8 @@
             <label for="password">Password:</label>
             <input type="password" id="password" name="password" required>
         </div>
-        <button type="submit">Register</button>
+        <button type="submit">Login</button>
     </form>
-    <p>Already have an account? <a href="/login">Login here</a></p>
+    <p>Don't have an account? <a href="/register">Register here</a></p>
 </body>
 </html>
