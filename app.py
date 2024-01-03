@@ -1,5 +1,6 @@
 from flask import Flask, request, render_template, redirect, url_for, session, flash
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.exc import IntegrityError  # Import IntegrityError
 from dotenv import load_dotenv
 from flask_bcrypt import Bcrypt
 import logging
@@ -76,11 +77,16 @@ def register():
 
             session['user_id'] = new_user.id
             return redirect(url_for('inbox', username=username))
-
-        return render_template('register.html')
+    except IntegrityError:  # Catch IntegrityError for duplicate username
+        db.session.rollback()
+        flash('Username already exists. Please choose a different one.')
+        return redirect(url_for('register'))
     except Exception as e:
         app.logger.error(f'Error in registration: {e}', exc_info=True)
-        raise
+        flash('An error occurred during registration. Please try again.')
+        return redirect(url_for('register'))
+
+    return render_template('register.html')
 
 @app.route('/enable-2fa', methods=['GET', 'POST'])
 def enable_2fa():
@@ -105,6 +111,7 @@ def enable_2fa():
     # Generate new 2FA secret and QR code
     temp_totp_secret = pyotp.random_base32()
     session['temp_totp_secret'] = temp_totp_secret
+    session['is_setting_up_2fa'] = True
     totp_uri = pyotp.totp.TOTP(temp_totp_secret).provisioning_uri(name=user.username, issuer_name="YourAppName")
     img = qrcode.make(totp_uri)
     buffered = io.BytesIO()
@@ -157,6 +164,7 @@ def verify_2fa_setup():
     totp = pyotp.TOTP(user.totp_secret)
     if totp.verify(verification_code):
         flash('2FA setup successful. Please log in again.')
+        session.pop('is_setting_up_2fa', None)
         return redirect(url_for('logout'))
     else:
         flash('Invalid 2FA code. Please try again.')
@@ -167,15 +175,20 @@ def login():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
+
+        app.logger.debug(f'Attempting login for user: {username}')
+
         user = User.query.filter_by(username=username).first()
 
         if user and bcrypt.check_password_hash(user.password_hash, password):
             session['user_id'] = user.id
-            if user.totp_secret:
+            if user.totp_secret and not session.get('is_setting_up_2fa'):
                 return redirect(url_for('verify_2fa_login'))
-            return redirect(url_for('inbox', username=username))
+            else:
+                return redirect(url_for('inbox', username=username))
         else:
             flash('Invalid username or password')
+            app.logger.debug('Login failed: Invalid username or password')
 
     return render_template('login.html')
 
@@ -210,10 +223,13 @@ def inbox(username):
 @app.route('/settings', methods=['GET', 'POST'])
 def settings():
     user_id = session.get('user_id')
-    if not user_id or (session.get('user').totp_secret and not session.get('2fa_verified', False)):
+    if not user_id:
         return redirect(url_for('login'))
 
     user = User.query.get(user_id)
+    if user.totp_secret and not session.get('2fa_verified', False):
+        return redirect(url_for('verify_2fa_login'))
+
     return render_template('settings.html', user=user)
 
 @app.route('/toggle-2fa', methods=['POST'])

@@ -10,8 +10,10 @@
         <!-- Navigation bar, logo, etc. -->
         {% if 'user_id' in session %}
             <p>Logged in as: {{ session['username'] }}</p>
-            <a href="{{ url_for('logout') }}">Logout</a>
+            <a href="{{ url_for('inbox', username=session.username) }}">Inbox</a>
+            <a href="{{ url_for('submit_message', username=session.username) }}">Submit Message</a>
             <a href="{{ url_for('settings') }}">Settings</a>
+            <a href="{{ url_for('logout') }}">Logout</a>
         {% else %}
             <a href="{{ url_for('login') }}">Login</a>
             <a href="{{ url_for('register') }}">Register</a>
