@@ -25,12 +25,15 @@ python3 -m venv venv
 source venv/bin/activate
 
 # Install Flask, Gunicorn, and other Python libraries
-pip install Flask pymysql python-dotenv gunicorn Flask-SQLAlchemy
+pip install Flask pymysql python-dotenv gunicorn Flask-SQLAlchemy Flask-Bcrypt
+
+SECRET_KEY=$(python3 -c 'import os; print(os.urandom(64).hex())')
 
 # Create .env file for Flask app
 echo "DB_NAME=$DB_NAME" > .env
 echo "DB_USER=$DB_USER" >> .env
 echo "DB_PASS=$DB_PASS" >> .env
+echo "SECRET_KEY=$SECRET_KEY" >> .env
 
 # Start MariaDB
 sudo systemctl start mariadb
