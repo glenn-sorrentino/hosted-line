@@ -168,6 +168,71 @@ def inbox(username):
     else:
         return 'Unauthorized', 401
 
+@app.route('/settings', methods=['GET', 'POST'])
+def settings():
+    user_id = session.get('user_id')
+    if not user_id:
+        return redirect(url_for('login'))
+
+    user = User.query.get(user_id)
+    return render_template('settings.html', user=user)
+
+@app.route('/toggle-2fa', methods=['POST'])
+def toggle_2fa():
+    user_id = session.get('user_id')
+    if not user_id:
+        return redirect(url_for('login'))
+
+    user = User.query.get(user_id)
+    if user.totp_secret:
+        user.totp_secret = None
+        flash('2FA is now disabled.')
+    else:
+        # Generate and store new 2FA secret
+        user.totp_secret = pyotp.random_base32()
+        flash('2FA is now enabled.')
+    
+    db.session.commit()
+    return redirect(url_for('settings'))
+
+@app.route('/change-password', methods=['POST'])
+def change_password():
+    user_id = session.get('user_id')
+    if not user_id:
+        return redirect(url_for('login'))
+
+    user = User.query.get(user_id)
+    old_password = request.form['old_password']
+    new_password = request.form['new_password']
+
+    if bcrypt.check_password_hash(user.password_hash, old_password):
+        user.password_hash = bcrypt.generate_password_hash(new_password).decode('utf-8')
+        db.session.commit()
+        flash('Password successfully changed.')
+    else:
+        flash('Incorrect old password.')
+
+    return redirect(url_for('settings'))
+
+@app.route('/change-username', methods=['POST'])
+def change_username():
+    user_id = session.get('user_id')
+    if not user_id:
+        return redirect(url_for('login'))
+
+    user = User.query.get(user_id)
+    new_username = request.form['new_username']
+    existing_user = User.query.filter_by(username=new_username).first()
+
+    if not existing_user:
+        user.username = new_username
+        db.session.commit()
+        flash('Username successfully changed.')
+    else:
+        flash('This username is already taken.')
+
+    return redirect(url_for('settings'))
+
 @app.route('/logout')
 def logout():
     session.pop('user_id', None)

@@ -16,7 +16,7 @@ sudo apt install python3 python3-pip git nginx default-mysql-server python3-venv
 cd /var/www/html
 git clone https://github.com/glenn-sorrentino/hosted-line
 cd hosted-line
-git switch 2fa
+git switch settings
 cd ..
 mv hosted-line hushline-hosted
 cd hushline-hosted
