@@ -133,10 +133,10 @@ def login():
         user = User.query.filter_by(username=username).first()
 
         if user and bcrypt.check_password_hash(user.password_hash, password):
-        session['user_id'] = user.id
-        if user.totp_secret:
-            return redirect(url_for('verify_2fa_login'))
-        return redirect(url_for('inbox', username=username))
+            session['user_id'] = user.id
+            if user.totp_secret:
+                return redirect(url_for('verify_2fa_login'))
+            return redirect(url_for('inbox', username=username))
         else:
             flash('Invalid username or password')
 
