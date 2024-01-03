@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Verify 2FA Setup</title>
+</head>
+<body>
+    <h1>Scan this QR Code with your 2FA app and enter the code</h1>
+    <img src="{{ qr_code_img }}" alt="QR Code">
+    <p>Your pairing code: {{ user_secret }}</p>
+    <form method="POST" action="{{ url_for('verify_2fa_setup') }}">
+        <input type="text" name="verification_code" placeholder="Enter 2FA code" required>
+        <button type="submit">Verify Setup</button>
+    </form>
+</body>
+</html>

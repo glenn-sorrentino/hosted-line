@@ -15,6 +15,9 @@ sudo apt install python3 python3-pip git nginx default-mysql-server python3-venv
 # Clone the repository
 cd /var/www/html
 git clone https://github.com/glenn-sorrentino/hosted-line
+cd hosted-line
+git switch 2fa
+cd ..
 mv hosted-line hushline-hosted
 cd hushline-hosted
 
@@ -25,7 +28,7 @@ python3 -m venv venv
 source venv/bin/activate
 
 # Install Flask, Gunicorn, and other Python libraries
-pip install Flask pymysql python-dotenv gunicorn Flask-SQLAlchemy Flask-Bcrypt
+pip install Flask pymysql python-dotenv gunicorn Flask-SQLAlchemy Flask-Bcrypt pyotp qrcode
 
 SECRET_KEY=$(python3 -c 'import os; print(os.urandom(64).hex())')
 
