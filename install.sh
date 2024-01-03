@@ -7,10 +7,14 @@ sudo apt install whiptail -y
 # Collect variables using whiptail
 DB_NAME=$(whiptail --inputbox "Enter the database name" 8 39 "hushlinedb" --title "Database Setup" 3>&1 1>&2 2>&3)
 DB_USER=$(whiptail --inputbox "Enter the database username" 8 39 "hushlineuser" --title "Database Setup" 3>&1 1>&2 2>&3)
-DB_PASS=$(whiptail --passwordbox "Enter the database password" 8 39 --title "Database Setup" 3>&1 1>&2 2>&3)
+DB_PASS=$(whiptail --passwordbox "Enter the database password" 8 39 "dbpassword" --title "Database Setup" 3>&1 1>&2 2>&3)
 
-# Install Python, pip, and Git
-sudo apt install python3 python3-pip git nginx -y
+# Install Python, pip, Git, Nginx, and MariaDB
+sudo apt install python3 python3-pip git nginx default-mysql-server python3-venv -y
+
+# Start MariaDB and run the secure installation
+sudo systemctl start mariadb
+sudo mysql_secure_installation
 
 # Clone the repository
 cd /var/www/html
@@ -20,15 +24,32 @@ cd hushline-hosted
 
 # Create a Python virtual environment
 python3 -m venv venv
+
+# Activate the virtual environment
 source venv/bin/activate
 
+# Install Flask, Gunicorn, and other Python libraries
+pip install Flask pymysql python-dotenv gunicorn Flask-SQLAlchemy
+
 # Create .env file for Flask app
-echo "DB_NAME=$DB_NAME" >> .env
+echo "DB_NAME=$DB_NAME" > .env
 echo "DB_USER=$DB_USER" >> .env
 echo "DB_PASS=$DB_PASS" >> .env
 
-# Install Flask, Gunicorn, and other Python libraries
-pip install Flask pymysql python-dotenv gunicorn
+# Run the Python script to create the database tables
+python init_db.py
+
+# Check if the database exists and create it if it doesn't
+if ! sudo mysql -sse "SELECT EXISTS(SELECT 1 FROM information_schema.schemata WHERE schema_name = '$DB_NAME')" | grep -q 1; then
+    sudo mysql -e "CREATE DATABASE $DB_NAME;"
+fi
+
+# Check if the user exists and create it if it doesn't
+if ! sudo mysql -sse "SELECT EXISTS(SELECT 1 FROM mysql.user WHERE user = '$DB_USER' AND host = 'localhost')" | grep -q 1; then
+    sudo mysql -e "CREATE USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASS';"
+    sudo mysql -e "GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';"
+    sudo mysql -e "FLUSH PRIVILEGES;"
+fi
 
 # Define the working directory
 WORKING_DIR=$(pwd)
@@ -44,8 +65,7 @@ After=network.target
 User=$USER
 Group=www-data
 WorkingDirectory=$WORKING_DIR
-Environment="PATH=$WORKING_DIR/venv/bin"
-ExecStart=$WORKING_DIR/venv/bin/gunicorn --workers 3 --bind unix:hushline-hosted.sock -m 007 wsgi:app
+ExecStart=$WORKING_DIR/venv/bin/gunicorn --workers 2 --bind unix:$WORKING_DIR/hushline-hosted.sock -m 007 --timeout 120 wsgi:app
 
 [Install]
 WantedBy=multi-user.target
@@ -61,7 +81,7 @@ NGINX_CONF=/etc/nginx/sites-available/hushline-hosted
 cat <<EOF | sudo tee $NGINX_CONF
 server {
     listen 80;
-    server_name your_server_domain_or_IP;
+    server_name localhost 164.92.99.92;
 
     location / {
         include proxy_params;
@@ -78,15 +98,5 @@ sudo systemctl restart nginx
 
 # Start and enable Nginx
 sudo systemctl enable nginx
-
-# Install MySQL and set up the database
-sudo apt install mysql-server -y
-sudo mysql_secure_installation
-
-# Create Database and User
-sudo mysql -e "CREATE DATABASE $DB_NAME;"
-sudo mysql -e "CREATE USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASS';"
-sudo mysql -e "GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';"
-sudo mysql -e "FLUSH PRIVILEGES;"
 
 echo "Installation and configuration complete."
