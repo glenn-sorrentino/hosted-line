@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+
+{% block content %}
+    <h1>Account Settings</h1>
+
+    <p>Logged in as: {{ user.username }}</p>
+
+    <!-- Two-Factor Authentication Section -->
+    <h2>Two-Factor Authentication</h2>
+    {% if user.totp_secret %}
+        <!-- If 2FA is enabled, show the Disable 2FA button -->
+        <form method="GET" action="{{ url_for('confirm_disable_2fa') }}">
+            <button type="submit">Disable 2FA</button>
+        </form>
+    {% else %}
+        <!-- If 2FA is disabled, show the Enable 2FA button -->
+        <form method="POST" action="{{ url_for('toggle_2fa') }}">
+            <button type="submit">Enable 2FA</button>
+        </form>
+    {% endif %}
+
+    <!-- Change Password Section -->
+    <h2>Change Password</h2>
+    <form method="POST" action="{{ url_for('change_password') }}">
+        <input type="password" name="old_password" placeholder="Old Password" required>
+        <input type="password" name="new_password" placeholder="New Password" required>
+        <button type="submit">Change Password</button>
+    </form>
+
+    <!-- Change Username Section -->
+    <h2>Change Username</h2>
+    <form method="POST" action="{{ url_for('change_username') }}">
+        <input type="text" name="new_username" placeholder="New Username" required>
+        <button type="submit">Change Username</button>
+    </form>
+
+    <a href="/logout">Logout</a>
+{% endblock %}

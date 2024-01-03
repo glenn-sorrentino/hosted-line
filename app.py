@@ -1,5 +1,6 @@
 from flask import Flask, request, render_template, redirect, url_for, session, flash
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.exc import IntegrityError  # Import IntegrityError
 from dotenv import load_dotenv
 from flask_bcrypt import Bcrypt
 import logging
@@ -76,22 +77,65 @@ def register():
 
             session['user_id'] = new_user.id
             return redirect(url_for('inbox', username=username))
-
-        return render_template('register.html')
+    except IntegrityError:  # Catch IntegrityError for duplicate username
+        db.session.rollback()
+        flash('Username already exists. Please choose a different one.')
+        return redirect(url_for('register'))
     except Exception as e:
         app.logger.error(f'Error in registration: {e}', exc_info=True)
-        raise
+        flash('An error occurred during registration. Please try again.')
+        return redirect(url_for('register'))
+
+    return render_template('register.html')
 
 @app.route('/enable-2fa', methods=['GET', 'POST'])
 def enable_2fa():
-    if 'user_id' not in session:
+    user_id = session.get('user_id')
+    if not user_id:
         return redirect(url_for('login'))
-    user = User.query.get(session['user_id'])
+
+    user = User.query.get(user_id)
     if request.method == 'POST':
-        user.totp_secret = pyotp.random_base32()
-        db.session.commit()
-        return redirect(url_for('show_qr_code'))
-    return render_template('enable_2fa.html')
+        verification_code = request.form['verification_code']
+        temp_totp_secret = session.get('temp_totp_secret')
+        if temp_totp_secret and pyotp.TOTP(temp_totp_secret).verify(verification_code):
+            user.totp_secret = temp_totp_secret
+            db.session.commit()
+            session.pop('temp_totp_secret', None)
+            flash('2FA setup successful.')
+            return redirect(url_for('settings'))
+        else:
+            flash('Invalid 2FA code. Please try again.')
+            return redirect(url_for('enable_2fa'))
+
+    # Generate new 2FA secret and QR code
+    temp_totp_secret = pyotp.random_base32()
+    session['temp_totp_secret'] = temp_totp_secret
+    session['is_setting_up_2fa'] = True
+    totp_uri = pyotp.totp.TOTP(temp_totp_secret).provisioning_uri(name=user.username, issuer_name="YourAppName")
+    img = qrcode.make(totp_uri)
+    buffered = io.BytesIO()
+    img.save(buffered)
+    qr_code_img = "data:image/png;base64," + base64.b64encode(buffered.getvalue()).decode()
+
+    # Pass the text-based pairing code to the template
+    return render_template('enable_2fa.html', qr_code_img=qr_code_img, text_code=temp_totp_secret)
+
+@app.route('/disable-2fa', methods=['POST'])
+def disable_2fa():
+    user_id = session.get('user_id')
+    if not user_id:
+        return redirect(url_for('login'))
+
+    user = User.query.get(user_id)
+    user.totp_secret = None
+    db.session.commit()
+    flash('2FA has been disabled.')
+    return redirect(url_for('settings'))
+
+@app.route('/confirm-disable-2fa', methods=['GET'])
+def confirm_disable_2fa():
+    return render_template('confirm_disable_2fa.html')
 
 @app.route('/show-qr-code')
 def show_qr_code():
@@ -120,6 +164,7 @@ def verify_2fa_setup():
     totp = pyotp.TOTP(user.totp_secret)
     if totp.verify(verification_code):
         flash('2FA setup successful. Please log in again.')
+        session.pop('is_setting_up_2fa', None)
         return redirect(url_for('logout'))
     else:
         flash('Invalid 2FA code. Please try again.')
@@ -130,15 +175,20 @@ def login():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
+
+        app.logger.debug(f'Attempting login for user: {username}')
+
         user = User.query.filter_by(username=username).first()
 
         if user and bcrypt.check_password_hash(user.password_hash, password):
             session['user_id'] = user.id
-            if user.totp_secret:
+            if user.totp_secret and not session.get('is_setting_up_2fa'):
                 return redirect(url_for('verify_2fa_login'))
-            return redirect(url_for('inbox', username=username))
+            else:
+                return redirect(url_for('inbox', username=username))
         else:
             flash('Invalid username or password')
+            app.logger.debug('Login failed: Invalid username or password')
 
     return render_template('login.html')
 
@@ -151,6 +201,7 @@ def verify_2fa_login():
         verification_code = request.form['verification_code']
         totp = pyotp.TOTP(user.totp_secret)
         if totp.verify(verification_code):
+            session['2fa_verified'] = True  # Set 2FA verification flag
             return redirect(url_for('inbox', username=user.username))
         else:
             flash('Invalid 2FA code. Please try again.')
@@ -164,13 +215,77 @@ def inbox(username):
     user = User.query.filter_by(username=username).first()
     if user and session['user_id'] == user.id:
         messages = Message.query.filter_by(user_id=user.id).all()
-        return render_template('inbox.html', messages=messages, username=username)
+        session['username'] = user.username  # Store username in session
+        return render_template('inbox.html', messages=messages, user=user)
     else:
         return 'Unauthorized', 401
+
+@app.route('/settings', methods=['GET', 'POST'])
+def settings():
+    user_id = session.get('user_id')
+    if not user_id:
+        return redirect(url_for('login'))
+
+    user = User.query.get(user_id)
+    if user.totp_secret and not session.get('2fa_verified', False):
+        return redirect(url_for('verify_2fa_login'))
+
+    return render_template('settings.html', user=user)
+
+@app.route('/toggle-2fa', methods=['POST'])
+def toggle_2fa():
+    user_id = session.get('user_id')
+    if not user_id:
+        return redirect(url_for('login'))
+
+    user = User.query.get(user_id)
+    if user.totp_secret:
+        return redirect(url_for('disable_2fa'))
+    else:
+        return redirect(url_for('enable_2fa'))
+
+@app.route('/change-password', methods=['POST'])
+def change_password():
+    user_id = session.get('user_id')
+    if not user_id:
+        return redirect(url_for('login'))
+
+    user = User.query.get(user_id)
+    old_password = request.form['old_password']
+    new_password = request.form['new_password']
+
+    if bcrypt.check_password_hash(user.password_hash, old_password):
+        user.password_hash = bcrypt.generate_password_hash(new_password).decode('utf-8')
+        db.session.commit()
+        flash('Password successfully changed.')
+    else:
+        flash('Incorrect old password.')
+
+    return redirect(url_for('settings'))
+
+@app.route('/change-username', methods=['POST'])
+def change_username():
+    user_id = session.get('user_id')
+    if not user_id:
+        return redirect(url_for('login'))
+
+    user = User.query.get(user_id)
+    new_username = request.form['new_username']
+    existing_user = User.query.filter_by(username=new_username).first()
+
+    if not existing_user:
+        user.username = new_username
+        db.session.commit()
+        flash('Username successfully changed.')
+    else:
+        flash('This username is already taken.')
+
+    return redirect(url_for('settings'))
 
 @app.route('/logout')
 def logout():
     session.pop('user_id', None)
+    session.pop('2fa_verified', None)  # Clear 2FA verification flag
     return redirect(url_for('index'))
 
 @app.route('/submit_message/<username>', methods=['GET', 'POST'])
