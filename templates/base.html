@@ -11,6 +11,7 @@
         {% if 'user_id' in session %}
             <p>Logged in as: {{ session['username'] }}</p>
             <a href="{{ url_for('logout') }}">Logout</a>
+            <a href="{{ url_for('settings') }}">Settings</a>
         {% else %}
             <a href="{{ url_for('login') }}">Login</a>
             <a href="{{ url_for('register') }}">Register</a>

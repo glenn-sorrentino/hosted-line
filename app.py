@@ -188,6 +188,7 @@ def verify_2fa_login():
         verification_code = request.form['verification_code']
         totp = pyotp.TOTP(user.totp_secret)
         if totp.verify(verification_code):
+            session['2fa_verified'] = True  # Set 2FA verification flag
             return redirect(url_for('inbox', username=user.username))
         else:
             flash('Invalid 2FA code. Please try again.')
@@ -209,7 +210,7 @@ def inbox(username):
 @app.route('/settings', methods=['GET', 'POST'])
 def settings():
     user_id = session.get('user_id')
-    if not user_id:
+    if not user_id or (session.get('user').totp_secret and not session.get('2fa_verified', False)):
         return redirect(url_for('login'))
 
     user = User.query.get(user_id)
@@ -268,6 +269,7 @@ def change_username():
 @app.route('/logout')
 def logout():
     session.pop('user_id', None)
+    session.pop('2fa_verified', None)  # Clear 2FA verification flag
     return redirect(url_for('index'))
 
 @app.route('/submit_message/<username>', methods=['GET', 'POST'])
