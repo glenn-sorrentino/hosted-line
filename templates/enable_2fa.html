@@ -1,13 +1,15 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Enable 2FA</title>
-</head>
-<body>
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+
+{% block content %}
     <h1>Enable Two-Factor Authentication</h1>
+    <p>Scan the QR code with your 2FA app or enter the text code below to enable 2FA.</p>
+    
+    <img src="{{ qr_code_img }}" alt="QR Code">
+    <p><strong>Text Code:</strong> {{ text_code }}</p>
+
     <form method="POST" action="{{ url_for('enable_2fa') }}">
-        <button type="submit">Enable 2FA</button>
+        <input type="text" name="verification_code" placeholder="Enter 2FA code" required>
+        <button type="submit">Verify and Enable</button>
     </form>
-</body>
-</html>
+{% endblock %}

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}{% endblock %} - Hushline</title>
+    <!-- Add common CSS files and other head elements here -->
+</head>
+<body>
+    <header>
+        <!-- Navigation bar, logo, etc. -->
+        {% if 'user_id' in session %}
+            <p>Logged in as: {{ session['username'] }}</p>
+            <a href="{{ url_for('logout') }}">Logout</a>
+        {% else %}
+            <a href="{{ url_for('login') }}">Login</a>
+            <a href="{{ url_for('register') }}">Register</a>
+        {% endif %}
+    </header>
+
+    <main>
+        {% block content %}
+        <!-- This block will be filled with page-specific content -->
+        {% endblock %}
+    </main>
+
+    <footer>
+        <!-- Common footer content -->
+    </footer>
+</body>
+</html>

@@ -84,14 +84,51 @@ def register():
 
 @app.route('/enable-2fa', methods=['GET', 'POST'])
 def enable_2fa():
-    if 'user_id' not in session:
+    user_id = session.get('user_id')
+    if not user_id:
         return redirect(url_for('login'))
-    user = User.query.get(session['user_id'])
+
+    user = User.query.get(user_id)
     if request.method == 'POST':
-        user.totp_secret = pyotp.random_base32()
-        db.session.commit()
-        return redirect(url_for('show_qr_code'))
-    return render_template('enable_2fa.html')
+        verification_code = request.form['verification_code']
+        temp_totp_secret = session.get('temp_totp_secret')
+        if temp_totp_secret and pyotp.TOTP(temp_totp_secret).verify(verification_code):
+            user.totp_secret = temp_totp_secret
+            db.session.commit()
+            session.pop('temp_totp_secret', None)
+            flash('2FA setup successful.')
+            return redirect(url_for('settings'))
+        else:
+            flash('Invalid 2FA code. Please try again.')
+            return redirect(url_for('enable_2fa'))
+
+    # Generate new 2FA secret and QR code
+    temp_totp_secret = pyotp.random_base32()
+    session['temp_totp_secret'] = temp_totp_secret
+    totp_uri = pyotp.totp.TOTP(temp_totp_secret).provisioning_uri(name=user.username, issuer_name="YourAppName")
+    img = qrcode.make(totp_uri)
+    buffered = io.BytesIO()
+    img.save(buffered)
+    qr_code_img = "data:image/png;base64," + base64.b64encode(buffered.getvalue()).decode()
+
+    # Pass the text-based pairing code to the template
+    return render_template('enable_2fa.html', qr_code_img=qr_code_img, text_code=temp_totp_secret)
+
+@app.route('/disable-2fa', methods=['POST'])
+def disable_2fa():
+    user_id = session.get('user_id')
+    if not user_id:
+        return redirect(url_for('login'))
+
+    user = User.query.get(user_id)
+    user.totp_secret = None
+    db.session.commit()
+    flash('2FA has been disabled.')
+    return redirect(url_for('settings'))
+
+@app.route('/confirm-disable-2fa', methods=['GET'])
+def confirm_disable_2fa():
+    return render_template('confirm_disable_2fa.html')
 
 @app.route('/show-qr-code')
 def show_qr_code():
@@ -164,7 +201,8 @@ def inbox(username):
     user = User.query.filter_by(username=username).first()
     if user and session['user_id'] == user.id:
         messages = Message.query.filter_by(user_id=user.id).all()
-        return render_template('inbox.html', messages=messages, username=username)
+        session['username'] = user.username  # Store username in session
+        return render_template('inbox.html', messages=messages, user=user)
     else:
         return 'Unauthorized', 401
 
@@ -185,15 +223,9 @@ def toggle_2fa():
 
     user = User.query.get(user_id)
     if user.totp_secret:
-        user.totp_secret = None
-        flash('2FA is now disabled.')
+        return redirect(url_for('disable_2fa'))
     else:
-        # Generate and store new 2FA secret
-        user.totp_secret = pyotp.random_base32()
-        flash('2FA is now enabled.')
-    
-    db.session.commit()
-    return redirect(url_for('settings'))
+        return redirect(url_for('enable_2fa'))
 
 @app.route('/change-password', methods=['POST'])
 def change_password():

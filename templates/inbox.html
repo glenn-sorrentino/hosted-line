@@ -1,14 +1,11 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Inbox</title>
-</head>
-<body>
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+
+{% block content %}
     <h1>Inbox for {{ username }}</h1>
     {% for message in messages %}
         <p>{{ message.content }}</p>
     {% else %}
         <p>No messages yet.</p>
     {% endfor %}
-</body>
-</html>
+{% endblock %}
