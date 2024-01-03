@@ -12,10 +12,6 @@ DB_PASS=$(whiptail --passwordbox "Enter the database password" 8 39 "dbpassword"
 # Install Python, pip, Git, Nginx, and MariaDB
 sudo apt install python3 python3-pip git nginx default-mysql-server python3-venv -y
 
-# Start MariaDB and run the secure installation
-sudo systemctl start mariadb
-sudo mysql_secure_installation
-
 # Clone the repository
 cd /var/www/html
 git clone https://github.com/glenn-sorrentino/hosted-line
@@ -36,10 +32,13 @@ echo "DB_NAME=$DB_NAME" > .env
 echo "DB_USER=$DB_USER" >> .env
 echo "DB_PASS=$DB_PASS" >> .env
 
-# Run the Python script to create the database tables
-python init_db.py
+# Start MariaDB
+sudo systemctl start mariadb
 
-# Check if the database exists and create it if it doesn't
+# Secure MariaDB Installation
+sudo mysql_secure_installation
+
+# Check if the database exists, create if not
 if ! sudo mysql -sse "SELECT EXISTS(SELECT 1 FROM information_schema.schemata WHERE schema_name = '$DB_NAME')" | grep -q 1; then
     sudo mysql -e "CREATE DATABASE $DB_NAME;"
 fi
@@ -49,6 +48,15 @@ if ! sudo mysql -sse "SELECT EXISTS(SELECT 1 FROM mysql.user WHERE user = '$DB_U
     sudo mysql -e "CREATE USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASS';"
     sudo mysql -e "GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';"
     sudo mysql -e "FLUSH PRIVILEGES;"
+fi
+
+# Verify Database Connection and Initialize DB
+echo "Verifying database connection and initializing database..."
+if ! python init_db.py; then
+    echo "Database initialization failed. Please check your settings."
+    exit 1
+else
+    echo "Database initialized successfully."
 fi
 
 # Define the working directory
@@ -75,6 +83,7 @@ EOF
 sudo systemctl daemon-reload
 sudo systemctl start hushline-hosted
 sudo systemctl enable hushline-hosted
+sudo systemctl restart hushline-hosted
 
 # Configure Nginx to proxy requests to the Flask app
 NGINX_CONF=/etc/nginx/sites-available/hushline-hosted
