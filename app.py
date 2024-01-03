@@ -99,12 +99,12 @@ def show_qr_code():
     if not user or not user.totp_secret:
         return redirect(url_for('enable_2fa'))
 
-    totp_uri = pyotp.totp.TOTP(user.totp_secret).provisioning_uri(name=user.username, issuer_name="YourAppName")
+    totp_uri = pyotp.totp.TOTP(user.totp_secret).provisioning_uri(name=user.username, issuer_name="Hush Line")
     img = qrcode.make(totp_uri)
 
     # Convert QR code to a data URI
     buffered = io.BytesIO()
-    img.save(buffered, format="PNG")
+    img.save(buffered)  # Removed the 'format' argument
     img_str = base64.b64encode(buffered.getvalue()).decode()
     qr_code_img = f"data:image/png;base64,{img_str}"
 
