@@ -91,9 +91,7 @@ def show_qr_code():
     # For example, save it as an image and pass the image URL to the template
     # Or convert it to a data URI (base64 encoded)
 
-    qr_code_img = "data:image/png;base64," + base64.b64encode(img.getbuffer()).decode()
-
-    return render_template('show_qr_code.html', qr_code_img=qr_code_img, totp_secret=user.totp_secret)
+    return render_template('show_qr_code.html', qr_code_img=qr_code_img)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
