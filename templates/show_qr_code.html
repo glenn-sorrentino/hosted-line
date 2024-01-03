@@ -2,18 +2,10 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>2FA QR Code</title>
+    <title>QR Code for 2FA</title>
 </head>
 <body>
-    <h1>2FA QR Code</h1>
-    <p>Scan this QR code with your 2FA app:</p>
-    <div>
-        <img src="{{ qr_code_img }}" alt="QR Code">
-    </div>
-    <p>Or, use this secret key:</p>
-    <div>
-        <code>{{ totp_secret }}</code>
-    </div>
-    <p><a href="/">Return to homepage</a></p>
+    <h1>Scan this QR Code with your 2FA app</h1>
+    <img src="{{ qr_code_img }}" alt="QR Code">
 </body>
 </html>
