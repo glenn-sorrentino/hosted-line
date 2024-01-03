@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Submit Message</title>
+</head>
+<body>
+    <h1>Submit a Message to {{ username }}</h1>
+    <form method="POST" action="/submit_message/{{ username }}">
+        <label for="content">Message:</label>
+        <textarea id="content" name="content" required></textarea>
+        <button type="submit">Send Message</button>
+    </form>
+</body>
+</html>
