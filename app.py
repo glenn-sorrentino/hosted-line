@@ -2,6 +2,8 @@ from flask import Flask, request, render_template, redirect, url_for, session, f
 from flask_sqlalchemy import SQLAlchemy
 from dotenv import load_dotenv
 from flask_bcrypt import Bcrypt
+import pyotp
+import qrcode
 import logging
 from logging.handlers import RotatingFileHandler
 import os
@@ -20,7 +22,6 @@ app.config['SECRET_KEY'] = secret_key
 app.config['SQLALCHEMY_DATABASE_URI'] = f"mysql+pymysql://{db_user}:{db_pass}@localhost/{db_name}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Initialize extensions
 bcrypt = Bcrypt(app)
 db = SQLAlchemy(app)
 
@@ -38,6 +39,7 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(128))
+    totp_secret = db.Column(db.String(100))
 
 class Message(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -77,20 +79,80 @@ def register():
         app.logger.error(f'Error in registration: {e}', exc_info=True)
         raise
 
+@app.route('/show-qr-code')
+def show_qr_code():
+    user = User.query.get(session['user_id'])
+    if not user or not user.totp_secret:
+        return redirect(url_for('index'))
+
+    totp_uri = pyotp.totp.TOTP(user.totp_secret).provisioning_uri(name=user.username, issuer_name="YourAppName")
+    img = qrcode.make(totp_uri)
+    # Convert QR code to a format that can be displayed in HTML
+    # For example, save it as an image and pass the image URL to the template
+    # Or convert it to a data URI (base64 encoded)
+
+    return render_template('show_qr_code.html', qr_code_img=qr_code_img)
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    user_has_2fa = False
+
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
         user = User.query.filter_by(username=username).first()
 
-        if user and bcrypt.check_password_hash(user.password_hash, password):
+        if user:
+            user_has_2fa = user.totp_secret is not None
+
+            if bcrypt.check_password_hash(user.password_hash, password):
+                if user_has_2fa:
+                    # User has 2FA enabled, render template with 2FA field
+                    return render_template('login.html', user_has_2fa=user_has_2fa)
+                else:
+                    # User does not have 2FA enabled, proceed with login
+                    session['user_id'] = user.id
+                    return redirect(url_for('inbox', username=username))
+            else:
+                flash('Invalid username or password')
+
+    return render_template('login.html', user_has_2fa=user_has_2fa)
+
+@app.route('/enable-2fa', methods=['GET', 'POST'])
+def enable_2fa():
+    user = User.query.get(session['user_id'])
+    if not user:
+        return redirect(url_for('login'))
+
+    if request.method == 'POST':
+        user.totp_secret = pyotp.random_base32()
+        db.session.commit()
+
+        totp_uri = pyotp.totp.TOTP(user.totp_secret).provisioning_uri(name=user.username, issuer_name="YourAppName")
+        img = qrcode.make(totp_uri)
+        # Handle the QR code appropriately here
+        
+        return render_template('show_qr_code.html', qr_code_img=qr_code_img)
+
+    return render_template('enable_2fa.html')
+
+@app.route('/verify-2fa', methods=['GET', 'POST'])
+def verify_2fa():
+    username = request.args.get('username')
+    user = User.query.filter_by(username=username).first()
+    if not user or not user.totp_secret:
+        return redirect(url_for('login'))
+
+    if request.method == 'POST':
+        user_input_code = request.form['totp_code']
+        totp = pyotp.TOTP(user.totp_secret)
+        if totp.verify(user_input_code):
             session['user_id'] = user.id
             return redirect(url_for('inbox', username=username))
         else:
-            flash('Invalid username or password')
+            flash('Invalid 2FA code')
 
-    return render_template('login.html')
+    return render_template('verify_2fa.html', username=username)
 
 @app.route('/inbox/<username>')
 def inbox(username):

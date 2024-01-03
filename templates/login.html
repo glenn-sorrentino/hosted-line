@@ -15,6 +15,12 @@
             <label for="password">Password:</label>
             <input type="password" id="password" name="password" required>
         </div>
+        {% if user_has_2fa %}
+        <div>
+            <label for="totp_code">2FA Code:</label>
+            <input type="text" id="totp_code" name="totp_code" required>
+        </div>
+        {% endif %}
         <button type="submit">Login</button>
     </form>
     <p>Don't have an account? <a href="/register">Register here</a></p>
