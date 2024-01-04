@@ -4,8 +4,6 @@
 {% block content %}
     <h1>Account Settings</h1>
 
-    <p>Logged in as: {{ session['username'] }}</p>
-
     <!-- Two-Factor Authentication Section -->
     <h2>Two-Factor Authentication</h2>
     {% if user.totp_secret %}
@@ -30,6 +28,7 @@
 
     <!-- Change Username Section -->
     <h2>Change Username</h2>
+    <p>Current Username: {{ session['username'] }}</p>
     <form method="POST" action="{{ url_for('change_username') }}">
         <input type="text" name="new_username" placeholder="New Username" required>
         <button type="submit">Change Username</button>
