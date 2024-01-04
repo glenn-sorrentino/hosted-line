@@ -62,5 +62,6 @@
         <textarea name="pgp_key" placeholder="Paste your public PGP key here">{{ user.pgp_key or '' }}</textarea>
         <button type="submit">Update PGP Key</button>
     </form>
+
     <a href="{{ url_for('logout') }}">Logout</a>
 {% endblock %}
