@@ -235,8 +235,11 @@ def login():
         if user and bcrypt.check_password_hash(user.password_hash, password):
             session["user_id"] = user.id
             session["username"] = user.username
-            if user.totp_secret and not session.get("is_setting_up_2fa"):
-                return redirect(url_for("verify_2fa_login"))
+
+            if user.totp_secret:  # Check if 2FA is enabled for the user
+                return redirect(
+                    url_for("verify_2fa_login")
+                )  # Redirect to 2FA verification
             else:
                 return redirect(url_for("inbox", username=username))
         else:
@@ -250,7 +253,12 @@ def login():
 def verify_2fa_login():
     if "user_id" not in session:
         return redirect(url_for("login"))
+
     user = User.query.get(session["user_id"])
+    if not user:
+        flash("User not found. Please login again.")
+        return redirect(url_for("login"))
+
     if request.method == "POST":
         verification_code = request.form["verification_code"]
         totp = pyotp.TOTP(user.totp_secret)
@@ -259,6 +267,7 @@ def verify_2fa_login():
             return redirect(url_for("inbox", username=user.username))
         else:
             flash("Invalid 2FA code. Please try again.")
+
     return render_template("verify_2fa_login.html")
 
 
