@@ -4,7 +4,7 @@
 {% block content %}
     <h1>Account Settings</h1>
 
-    <p>Logged in as: {{ user.username }}</p>
+    <p>Logged in as: {{ session['username'] }}</p>
 
     <!-- Two-Factor Authentication Section -->
     <h2>Two-Factor Authentication</h2>

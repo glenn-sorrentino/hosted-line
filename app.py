@@ -76,6 +76,7 @@ def register():
             db.session.commit()
 
             session['user_id'] = new_user.id
+            flash('Registration successful! Please log in.')
             return redirect(url_for('inbox', username=username))
     except IntegrityError:  # Catch IntegrityError for duplicate username
         db.session.rollback()
@@ -182,6 +183,7 @@ def login():
 
         if user and bcrypt.check_password_hash(user.password_hash, password):
             session['user_id'] = user.id
+            session['username'] = user.username
             if user.totp_secret and not session.get('is_setting_up_2fa'):
                 return redirect(url_for('verify_2fa_login'))
             else:
@@ -209,16 +211,26 @@ def verify_2fa_login():
 
 @app.route('/inbox/<username>')
 def inbox(username):
+    app.logger.debug(f"Session Username: {session.get('username')}, URL Username: {username}")
+    
     if 'user_id' not in session:
-        return redirect(url_for('login'))
+        app.logger.debug("No user_id in session")
+        return 'Unauthorized', 401
+    if session.get('username') != username:
+        app.logger.debug("Session username does not match URL username")
+        return 'Unauthorized', 401
 
     user = User.query.filter_by(username=username).first()
-    if user and session['user_id'] == user.id:
-        messages = Message.query.filter_by(user_id=user.id).all()
-        session['username'] = user.username  # Store username in session
-        return render_template('inbox.html', messages=messages, user=user)
-    else:
+    if not user:
+        app.logger.debug("No user found with this username")
         return 'Unauthorized', 401
+    app.logger.debug(f"Session User ID: {session.get('user_id')}, DB User ID: {user.id}")
+    if session['user_id'] != user.id:
+        app.logger.debug("Session user_id does not match DB user ID")
+        return 'Unauthorized', 401
+
+    messages = Message.query.filter_by(user_id=user.id).all()
+    return render_template('inbox.html', messages=messages, user=user)
 
 @app.route('/settings', methods=['GET', 'POST'])
 def settings():
@@ -276,6 +288,7 @@ def change_username():
     if not existing_user:
         user.username = new_username
         db.session.commit()
+        session['username'] = new_username  # Update username in session
         flash('Username successfully changed.')
     else:
         flash('This username is already taken.')
@@ -297,8 +310,11 @@ def submit_message(username):
             message = Message(content=content, user_id=user.id)
             db.session.add(message)
             db.session.commit()
-            return 'Message sent!'
-        return 'User not found', 404
+            flash('Message sent successfully!')  # Flash a success message
+            return redirect(url_for('submit_message', username=username))
+        else:
+            flash('User not found')  # Flash an error message
+            return redirect(url_for('submit_message', username=username))
     return render_template('submit_message.html', username=username)
 
 if __name__ == '__main__':

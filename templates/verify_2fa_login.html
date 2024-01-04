@@ -1,27 +1,10 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Verify 2FA - Hushline</title>
-    <!-- Add common CSS files and other head elements here -->
-</head>
-<body>
-    <header>
-        <!-- Navigation bar, logo, etc. -->
-            <p>Logged in as: {{ session['username'] }}</p>
-            <a href="{{ url_for('logout') }}">Logout</a>
-    </header>
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
 
-    <main>
-        <h1>Enter your 2FA Code</h1>
+{% block content %}
+    <h1>Enter your 2FA Code</h1>
         <form method="POST" action="{{ url_for('verify_2fa_login') }}">
             <input type="text" name="verification_code" placeholder="2FA Code" required>
             <button type="submit">Verify</button>
         </form>
-    </main>
-
-    <footer>
-        <!-- Common footer content -->
-    </footer>
-</body>
-</html>
+{% endblock %}
