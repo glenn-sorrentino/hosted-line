@@ -3,6 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.exc import IntegrityError  # Import IntegrityError
 from dotenv import load_dotenv
 from flask_bcrypt import Bcrypt
+from datetime import datetime
 import logging
 from logging.handlers import RotatingFileHandler
 import os
@@ -13,6 +14,7 @@ import base64
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from werkzeug.security import generate_password_hash
 import gnupg
 
 # Load environment variables
@@ -76,6 +78,16 @@ class Message(db.Model):
     user = db.relationship("User", backref=db.backref("messages", lazy=True))
 
 
+class InviteCode(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(255), unique=True, nullable=False)
+    expiration_date = db.Column(db.DateTime, nullable=False)
+    used = db.Column(db.Boolean, default=False, nullable=False)
+
+    def __repr__(self):
+        return "<InviteCode %r>" % self.code
+
+
 # Error Handler
 @app.errorhandler(Exception)
 def handle_exception(e):
@@ -92,35 +104,34 @@ def index():
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
-    try:
-        if request.method == "POST":
-            username = request.form["username"]
-            password = request.form["password"]
-            password_hash = bcrypt.generate_password_hash(password).decode("utf-8")
-            new_user = User(username=username, password_hash=password_hash)
+    if request.method == "POST":
+        username = request.form.get("username")
+        password = request.form.get("password")
+        invite_code = request.form.get("invite_code")
 
-            db.session.add(new_user)
-            db.session.commit()
+        # Check if invite code is valid
+        valid_code = InviteCode.query.filter_by(code=invite_code, used=False).first()
+        if valid_code is None or valid_code.expiration_date < datetime.utcnow():
+            flash("Invalid or expired invite code.")
+            return redirect(url_for("register"))
 
-            flash("Registration successful! Please log in.")
-            return redirect(
-                url_for("login")
-            )  # Redirect to login page after registration
-    except IntegrityError:  # Catch IntegrityError for duplicate username
-        # Set user_id and username in session
-        session["user_id"] = new_user.id
-        session["username"] = username
+        # Check for existing user
+        existing_user = User.query.filter_by(username=username).first()
+        if existing_user:
+            flash("Username already exists.")
+            return redirect(url_for("register"))
+
+        # Create new user
+        hashed_password = generate_password_hash(password)
+        new_user = User(username=username, password_hash=hashed_password)
+        db.session.add(new_user)
+
+        # Mark invite code as used
+        valid_code.used = True
+        db.session.commit()
 
         flash("Registration successful! Please log in.")
-        return redirect(url_for("login"))  # Redirect to login page
-    except IntegrityError:
-        db.session.rollback()
-        flash("Username already exists. Please choose a different one.")
-        return redirect(url_for("register"))
-    except Exception as e:
-        app.logger.error(f"Error in registration: {e}", exc_info=True)
-        flash("An error occurred during registration. Please try again.")
-        return redirect(url_for("register"))
+        return redirect(url_for("login"))
 
     return render_template("register.html")
 
