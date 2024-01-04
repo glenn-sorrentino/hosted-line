@@ -21,6 +21,9 @@ cd ..
 mv hosted-line hushline-hosted
 cd hushline-hosted
 
+mkdir ~/.gnupg
+chmod 700 ~/.gnupg
+
 # Create a Python virtual environment
 python3 -m venv venv
 
