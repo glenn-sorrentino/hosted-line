@@ -10,6 +10,10 @@ import pyotp
 import qrcode
 import io
 import base64
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import gnupg
 
 # Load environment variables
 load_dotenv()
@@ -44,6 +48,12 @@ class User(db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(128))
     totp_secret = db.Column(db.String(100))
+    email = db.Column(db.String(255))
+    smtp_server = db.Column(db.String(255))
+    smtp_port = db.Column(db.Integer)
+    smtp_username = db.Column(db.String(255))
+    smtp_password = db.Column(db.String(255))
+    pgp_key = db.Column(db.Text)
 
 class Message(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -316,6 +326,54 @@ def submit_message(username):
             flash('User not found')  # Flash an error message
             return redirect(url_for('submit_message', username=username))
     return render_template('submit_message.html', username=username)
+
+def send_email(recipient, subject, body, user):
+    app.logger.debug(f"SMTP settings being used: Server: {user.smtp_server}, Port: {user.smtp_port}, Username: {user.smtp_username}")
+    msg = MIMEMultipart()
+    msg['From'] = user.email
+    msg['To'] = recipient
+    msg['Subject'] = subject
+
+    msg.attach(MIMEText(body, 'plain'))
+
+    try:
+        with smtplib.SMTP(user.smtp_server, user.smtp_port) as server:
+            server.starttls()
+            server.login(user.smtp_username, user.smtp_password)  # Use user's SMTP credentials
+            text = msg.as_string()
+            server.sendmail(user.email, recipient, text)
+        app.logger.info("Email sent successfully.")
+        return True
+    except Exception as e:
+        app.logger.error(f"Error sending email: {e}")
+        return False
+
+@app.route('/update_pgp_key', methods=['POST'])
+def update_pgp_key():
+    user_id = session.get('user_id')
+    if not user_id:
+        return redirect(url_for('login'))
+
+    user = User.query.get(user_id)
+    if not user:
+        flash('User not found')
+        return redirect(url_for('settings'))
+
+    user.pgp_key = request.form.get('pgp_key')
+    db.session.commit()
+    flash('PGP key updated successfully')
+    return redirect(url_for('settings'))
+
+def encrypt_message(message, pgp_key):
+    gpg = gnupg.GPG()
+    encrypted_data = gpg.encrypt(message, pgp_key)
+    return str(encrypted_data) if encrypted_data.ok else None
+
+# Modify the part in submit_message where you handle message sending
+if user.pgp_key:
+    encrypted_content = encrypt_message(content, user.pgp_key)
+    if encrypted_content:
+        # Use encrypted_content instead of content
 
 if __name__ == '__main__':
     with app.app_context():
