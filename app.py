@@ -433,13 +433,11 @@ def send_email(recipient, subject, body, user):
         return False
 
 def is_valid_pgp_key(key):
-    """
-    Check if the provided key is a valid PGP key and attempt to import it.
-    """
+    app.logger.debug(f"Attempting to import key: {key}")
     try:
         imported_key = gpg.import_keys(key)
         app.logger.info(f"Key import attempt: {imported_key.results}")
-        return imported_key.count > 0  # True if key is valid
+        return imported_key.count > 0
     except Exception as e:
         app.logger.error(f"Error importing PGP key: {e}")
         return False
