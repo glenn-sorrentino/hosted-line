@@ -14,7 +14,7 @@ import base64
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from werkzeug.security import generate_password_hash
+from werkzeug.security import generate_password_hash, check_password_hash
 import gnupg
 
 # Load environment variables
@@ -61,7 +61,7 @@ app.logger.setLevel(logging.DEBUG)
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
-    password_hash = db.Column(db.String(128))
+    password_hash = db.Column(db.String(255))
     totp_secret = db.Column(db.String(100))
     email = db.Column(db.String(255))
     smtp_server = db.Column(db.String(255))
@@ -121,8 +121,8 @@ def register():
             flash("Username already exists.")
             return redirect(url_for("register"))
 
-        # Create new user
-        hashed_password = generate_password_hash(password)
+        # Create new user with hashed password
+        hashed_password = bcrypt.generate_password_hash(password).decode("utf-8")
         new_user = User(username=username, password_hash=hashed_password)
         db.session.add(new_user)
 
@@ -243,14 +243,13 @@ def login():
 
         user = User.query.filter_by(username=username).first()
 
+        # Check password and if 2FA is enabled
         if user and bcrypt.check_password_hash(user.password_hash, password):
             session["user_id"] = user.id
             session["username"] = user.username
 
-            if user.totp_secret:  # Check if 2FA is enabled for the user
-                return redirect(
-                    url_for("verify_2fa_login")
-                )  # Redirect to 2FA verification
+            if user.totp_secret:
+                return redirect(url_for("verify_2fa_login"))
             else:
                 return redirect(url_for("inbox", username=username))
         else:
