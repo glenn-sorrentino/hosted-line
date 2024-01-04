@@ -83,10 +83,13 @@ def register():
             db.session.add(new_user)
             db.session.commit()
 
+            # Set user_id and username in session
             session['user_id'] = new_user.id
+            session['username'] = username
+
             flash('Registration successful! Please log in.')
-            return redirect(url_for('inbox', username=username))
-    except IntegrityError:  # Catch IntegrityError for duplicate username
+            return redirect(url_for('login'))  # Redirect to login page
+    except IntegrityError:
         db.session.rollback()
         flash('Username already exists. Please choose a different one.')
         return redirect(url_for('register'))
@@ -303,6 +306,28 @@ def change_username():
 
     return redirect(url_for('settings'))
 
+@app.route('/update_smtp_settings', methods=['POST'])
+def update_smtp_settings():
+    user_id = session.get('user_id')
+    if not user_id:
+        return redirect(url_for('login'))
+
+    user = User.query.get(user_id)
+    if not user:
+        flash('User not found')
+        return redirect(url_for('settings'))
+
+    # Updating SMTP settings from form data
+    user.email = request.form.get('email')
+    user.smtp_server = request.form.get('smtp_server')
+    user.smtp_port = request.form.get('smtp_port')
+    user.smtp_username = request.form.get('smtp_username')
+    user.smtp_password = request.form.get('smtp_password')
+
+    db.session.commit()
+    flash('SMTP settings updated successfully')
+    return redirect(url_for('settings'))
+
 @app.route('/logout')
 def logout():
     session.pop('user_id', None)
@@ -319,26 +344,23 @@ def submit_message(username):
             db.session.add(message)
             db.session.commit()
 
-            # Check if user has provided email settings
             if user.email and user.smtp_server and user.smtp_port and user.smtp_username and user.smtp_password:
-                # Send email
+                # Send email using user's SMTP settings
                 if send_email(user.email, "New Message", content, user):
                     flash('Message sent successfully via email!')
                 else:
                     flash('Message sent but failed to send via email.')
             else:
-                flash('Message sent successfully!')
-            
-            return redirect(url_for('submit_message', username=username))
+                flash('Message sent successfully! Email settings are not configured.')
         else:
             flash('User not found')
-            return redirect(url_for('submit_message', username=username))
     
     return render_template('submit_message.html', username=username)
 
 def send_email(recipient, subject, body, user):
+    app.logger.debug(f"SMTP settings being used: Server: {user.smtp_server}, Port: {user.smtp_port}, Username: {user.smtp_username}")
     msg = MIMEMultipart()
-    msg['From'] = user.smtp_username
+    msg['From'] = user.email
     msg['To'] = recipient
     msg['Subject'] = subject
 
@@ -347,12 +369,12 @@ def send_email(recipient, subject, body, user):
     try:
         with smtplib.SMTP(user.smtp_server, user.smtp_port) as server:
             server.starttls()
-            server.login(user.smtp_username, user.smtp_password)
+            server.login(user.smtp_username, user.smtp_password)  # Use user's SMTP credentials
             text = msg.as_string()
-            server.sendmail(user.smtp_username, recipient, text)
+            server.sendmail(user.email, recipient, text)
+        app.logger.info("Email sent successfully.")
         return True
     except Exception as e:
-        # Log the exception
         app.logger.error(f"Error sending email: {e}")
         return False
 
