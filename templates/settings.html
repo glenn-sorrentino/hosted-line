@@ -35,7 +35,6 @@
         <button type="submit">Change Username</button>
     </form>
 
-        <!-- SMTP Settings Fields -->
     <!-- SMTP Settings Fields -->
     <h2>Email Settings (for message delivery)</h2>
     <form method="POST" action="{{ url_for('update_smtp_settings') }}">
@@ -55,6 +54,13 @@
         <input type="password" name="smtp_password" id="smtp_password" placeholder="Enter password to change it">
 
         <button type="submit">Update Settings</button>
+    </form>
+
+    <!-- PGP Key Section -->
+    <h2>Public PGP Key</h2>
+    <form method="POST" action="{{ url_for('update_pgp_key') }}">
+        <textarea name="pgp_key" placeholder="Paste your public PGP key here">{{ user.pgp_key or '' }}</textarea>
+        <button type="submit">Update PGP Key</button>
     </form>
 
     <a href="{{ url_for('logout') }}">Logout</a>

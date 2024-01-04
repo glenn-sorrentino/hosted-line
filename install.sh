@@ -10,13 +10,13 @@ DB_USER=$(whiptail --inputbox "Enter the database username" 8 39 "hushlineuser" 
 DB_PASS=$(whiptail --passwordbox "Enter the database password" 8 39 "dbpassword" --title "Database Setup" 3>&1 1>&2 2>&3)
 
 # Install Python, pip, Git, Nginx, and MariaDB
-sudo apt install python3 python3-pip git nginx default-mysql-server python3-venv -y
+sudo apt install python3 python3-pip git nginx default-mysql-server python3-venv gnupg -y
 
 # Clone the repository
 cd /var/www/html
 git clone https://github.com/glenn-sorrentino/hosted-line
 cd hosted-line
-git switch settings
+git switch pgp
 cd ..
 mv hosted-line hushline-hosted
 cd hushline-hosted
@@ -28,7 +28,7 @@ python3 -m venv venv
 source venv/bin/activate
 
 # Install Flask, Gunicorn, and other Python libraries
-pip install Flask pymysql python-dotenv gunicorn Flask-SQLAlchemy Flask-Bcrypt pyotp qrcode
+pip install Flask pymysql python-dotenv gunicorn Flask-SQLAlchemy Flask-Bcrypt pyotp qrcode python-gnupg
 
 SECRET_KEY=$(python3 -c 'import os; print(os.urandom(64).hex())')
 

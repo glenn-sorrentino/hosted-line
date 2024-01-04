@@ -13,6 +13,7 @@ import base64
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+import gnupg
 
 # Load environment variables
 load_dotenv()
@@ -27,6 +28,10 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = secret_key
 app.config['SQLALCHEMY_DATABASE_URI'] = f"mysql+pymysql://{db_user}:{db_pass}@localhost/{db_name}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Initialize GPG with expanded home directory
+gpg_home = os.path.expanduser('~/.gnupg')
+gpg = gnupg.GPG(gnupghome=gpg_home)
 
 # Initialize extensions
 bcrypt = Bcrypt(app)
@@ -52,6 +57,7 @@ class User(db.Model):
     smtp_port = db.Column(db.Integer)
     smtp_username = db.Column(db.String(255))
     smtp_password = db.Column(db.String(255))
+    pgp_key = db.Column(db.Text)
 
 class Message(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -83,6 +89,9 @@ def register():
             db.session.add(new_user)
             db.session.commit()
 
+            flash('Registration successful! Please log in.')
+            return redirect(url_for('login'))  # Redirect to login page after registration
+    except IntegrityError:  # Catch IntegrityError for duplicate username
             # Set user_id and username in session
             session['user_id'] = new_user.id
             session['username'] = username
@@ -106,7 +115,7 @@ def enable_2fa():
     if not user_id:
         return redirect(url_for('login'))
 
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
     if request.method == 'POST':
         verification_code = request.form['verification_code']
         temp_totp_secret = session.get('temp_totp_secret')
@@ -139,7 +148,7 @@ def disable_2fa():
     if not user_id:
         return redirect(url_for('login'))
 
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
     user.totp_secret = None
     db.session.commit()
     flash('2FA has been disabled.')
@@ -249,7 +258,7 @@ def settings():
     if not user_id:
         return redirect(url_for('login'))
 
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
     if user.totp_secret and not session.get('2fa_verified', False):
         return redirect(url_for('verify_2fa_login'))
 
@@ -261,7 +270,7 @@ def toggle_2fa():
     if not user_id:
         return redirect(url_for('login'))
 
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
     if user.totp_secret:
         return redirect(url_for('disable_2fa'))
     else:
@@ -273,7 +282,7 @@ def change_password():
     if not user_id:
         return redirect(url_for('login'))
 
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
     old_password = request.form['old_password']
     new_password = request.form['new_password']
 
@@ -292,7 +301,7 @@ def change_username():
     if not user_id:
         return redirect(url_for('login'))
 
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
     new_username = request.form['new_username']
     existing_user = User.query.filter_by(username=new_username).first()
 
@@ -338,6 +347,46 @@ def logout():
 def submit_message(username):
     if request.method == 'POST':
         user = User.query.filter_by(username=username).first()
+        if not user:
+            flash('User not found')
+            return redirect(url_for('submit_message', username=username))
+
+        content = request.form['content']
+        email_content = content  # Default to original content
+        email_sent = False  # Flag to track email sending status
+
+        if user.pgp_key:
+            encrypted_content = encrypt_message(content, 'tips@scidsg.org')
+            if encrypted_content:
+                message = Message(content=encrypted_content, user_id=user.id)
+                email_content = encrypted_content  # Use encrypted content for email
+            else:
+                flash('Failed to encrypt message with PGP key.')
+                return redirect(url_for('submit_message', username=username))
+        else:
+            message = Message(content=content, user_id=user.id)
+
+        db.session.add(message)
+        db.session.commit()
+
+        # Checking if SMTP settings are configured
+        if user.email and user.smtp_server and user.smtp_port and user.smtp_username and user.smtp_password:
+            email_sent = send_email(user.email, "New Message", email_content, user)
+
+        # Custom flash message for both scenarios
+        if email_sent:
+            flash("Message submitted and emailed")
+        else:
+            flash("Message submitted")
+
+        return redirect(url_for('submit_message', username=username))
+
+    return render_template('submit_message.html', username=username)
+
+def send_email(recipient, subject, body, user):
+    app.logger.debug(f"Preparing to send email to {recipient}")
+    app.logger.debug(f"SMTP settings being used: Server: {user.smtp_server}, Port: {user.smtp_port}, Username: {user.smtp_username}, Email: {user.email}")
+
         if user:
             content = request.form['content']
             message = Message(content=content, user_id=user.id)
@@ -363,6 +412,114 @@ def send_email(recipient, subject, body, user):
     msg['From'] = user.email
     msg['To'] = recipient
     msg['Subject'] = subject
+    msg.attach(MIMEText(body, 'plain'))
+
+    try:
+        app.logger.debug("Attempting to connect to SMTP server")
+        with smtplib.SMTP(user.smtp_server, user.smtp_port) as server:
+            app.logger.debug("Starting TLS")
+            server.starttls()
+
+            app.logger.debug("Attempting to log in to SMTP server")
+            server.login(user.smtp_username, user.smtp_password)
+
+            app.logger.debug("Sending email")
+            text = msg.as_string()
+            server.sendmail(user.email, recipient, text)
+            app.logger.info("Email sent successfully.")
+            return True
+    except Exception as e:
+        app.logger.error(f"Error sending email: {e}", exc_info=True)
+        return False
+
+def is_valid_pgp_key(key):
+    """
+    Check if the provided key is a valid PGP key and attempt to import it.
+    """
+    try:
+        imported_key = gpg.import_keys(key)
+        app.logger.info(f"Key import attempt: {imported_key.results}")
+        return imported_key.count > 0  # True if key is valid
+    except Exception as e:
+        app.logger.error(f"Error importing PGP key: {e}")
+        return False
+
+@app.route('/update_pgp_key', methods=['POST'])
+def update_pgp_key():
+    """
+    Route to update the user's PGP key.
+    """
+    user_id = session.get('user_id')
+    if not user_id:
+        flash('User not authenticated.')
+        return redirect(url_for('login'))
+
+    user = db.session.get(User, user_id)
+    if not user:
+        flash('User not found.')
+        return redirect(url_for('settings'))
+
+    pgp_key = request.form.get('pgp_key')
+    if pgp_key and is_valid_pgp_key(pgp_key):
+        user.pgp_key = pgp_key
+        db.session.commit()
+        flash('PGP key updated successfully.')
+    else:
+        flash('Invalid PGP key format or import failed.')
+
+    return redirect(url_for('settings'))
+
+def encrypt_message(message, recipient):
+    # Get the absolute path to the .gnupg directory
+    gpg_home = os.path.expanduser('~/.gnupg')
+
+    # Initialize GPG with the absolute path and custom options
+    gpg = gnupg.GPG(gnupghome=gpg_home, options=['--trust-model', 'always'])
+    
+    app.logger.info(f"Encrypting message for recipient: {recipient}")
+
+    # Perform encryption
+    encrypted_data = gpg.encrypt(message, recipients=recipient, always_trust=True)
+
+    if not encrypted_data.ok:
+        app.logger.error(f"Encryption failed: {encrypted_data.status}")
+        return None
+
+    return str(encrypted_data)
+
+def list_keys():
+    try:
+        public_keys = gpg.list_keys()
+        app.logger.info("Public keys in the keyring:")
+        for key in public_keys:
+            app.logger.info(f"Key: {key}")
+    except Exception as e:
+        app.logger.error(f"Error listing keys: {e}")
+
+# Call this function after key import or during troubleshooting
+list_keys()
+
+@app.route('/update_smtp_settings', methods=['POST'])
+def update_smtp_settings():
+    user_id = session.get('user_id')
+    if not user_id:
+        return redirect(url_for('login'))
+
+    user = db.session.get(User, user_id)
+    if not user:
+        flash('User not found')
+        return redirect(url_for('settings'))
+
+    # Updating SMTP settings from form data
+    user.email = request.form.get('email')
+    user.smtp_server = request.form.get('smtp_server')
+    user.smtp_port = request.form.get('smtp_port')
+    user.smtp_username = request.form.get('smtp_username')
+    user.smtp_password = request.form.get('smtp_password')
+
+    db.session.commit()
+    flash('SMTP settings updated successfully')
+    return redirect(url_for('settings'))
 
     msg.attach(MIMEText(body, 'plain'))
 
