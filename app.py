@@ -131,7 +131,7 @@ def enable_2fa():
     if not user_id:
         return redirect(url_for("login"))
 
-    user = db.session.get(User, user_id)
+    user = User.query.get(user_id)
     if request.method == "POST":
         verification_code = request.form["verification_code"]
         temp_totp_secret = session.get("temp_totp_secret")
@@ -139,8 +139,8 @@ def enable_2fa():
             user.totp_secret = temp_totp_secret
             db.session.commit()
             session.pop("temp_totp_secret", None)
-            flash("2FA setup successful.")
-            return redirect(url_for("settings"))
+            flash("2FA setup successful. Please log in again with 2FA.")
+            return redirect(url_for("logout"))  # Redirect to logout
         else:
             flash("Invalid 2FA code. Please try again.")
             return redirect(url_for("enable_2fa"))
