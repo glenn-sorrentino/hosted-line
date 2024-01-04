@@ -8,7 +8,7 @@
 <body>
     <header>
         <!-- Navigation bar, logo, etc. -->
-        <h1>Hosted Line</h1>
+        <h1>🤫 Hush Line</h1>
         {% if 'user_id' in session and 'username' in session %}
             <nav>
                 <ul>
@@ -17,12 +17,16 @@
                     <li><a href="{{ url_for('submit_message', username=session.username) }}">Submit Message</a></li>
                     <li><a href="{{ url_for('settings') }}">Settings</a></li>
                     <li><a href="{{ url_for('logout') }}">Logout</a></li>
-            {% else %}
-                    <li><a href="{{ url_for('login') }}">Login</a></li>
-                    <li><a href="{{ url_for('register') }}">Register</a></li>
-            {% endif %}
                 </ul>
             </nav>
+            {% else %}
+            <nav>
+                <ul>
+                    <li><a href="{{ url_for('login') }}">Login</a></li>
+                    <li><a href="{{ url_for('register') }}">Register</a></li>
+                </ul>
+            </nav>
+            {% endif %}
     </header>
 
     {% with messages = get_flashed_messages() %}

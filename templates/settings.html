@@ -4,63 +4,74 @@
 {% block content %}
     <h1>Account Settings</h1>
 
-    <!-- Two-Factor Authentication Section -->
-    <h2>Two-Factor Authentication</h2>
-    {% if user.totp_secret %}
-        <!-- If 2FA is enabled, show the Disable 2FA button -->
-        <form method="GET" action="{{ url_for('confirm_disable_2fa') }}">
-            <button type="submit">Disable 2FA</button>
+    <div class="formBody">
+
+        <!-- Two-Factor Authentication Section -->
+        <h2>Two-Factor Authentication</h2>
+        {% if user.totp_secret %}
+            <!-- If 2FA is enabled, show the Disable 2FA button -->
+            <form method="GET" action="{{ url_for('confirm_disable_2fa') }}">
+                <button type="submit">Disable 2FA</button>
+            </form>
+        {% else %}
+            <!-- If 2FA is disabled, show the Enable 2FA button -->
+            <form method="POST" action="{{ url_for('toggle_2fa') }}">
+                <button type="submit">Enable 2FA</button>
+            </form>
+        {% endif %}
+
+        <!-- Change Password Section -->
+        <h2>Change Password</h2>
+        <form method="POST" action="{{ url_for('change_password') }}">
+            <label for="old_password">Old Password</label>
+            <input type="password" name="old_password" id="old_password" required>
+
+            <label for="new_password">New Password</label>
+            <input type="password" name="new_password" id="new_password" required>
+
+            <button type="submit">Change Password</button>
         </form>
-    {% else %}
-        <!-- If 2FA is disabled, show the Enable 2FA button -->
-        <form method="POST" action="{{ url_for('toggle_2fa') }}">
-            <button type="submit">Enable 2FA</button>
+
+        <!-- Change Username Section -->
+        <h2>Change Username</h2>
+        <p class="meta">Current Username: {{ session['username'] }}</p>
+        <form method="POST" action="{{ url_for('change_username') }}">
+            <label for="new_username">New Username</label>
+            <input type="text" name="new_username" id="new_username" required>
+
+            <button type="submit">Change Username</button>
         </form>
-    {% endif %}
 
-    <!-- Change Password Section -->
-    <h2>Change Password</h2>
-    <form method="POST" action="{{ url_for('change_password') }}">
-        <input type="password" name="old_password" placeholder="Old Password" required>
-        <input type="password" name="new_password" placeholder="New Password" required>
-        <button type="submit">Change Password</button>
-    </form>
+        <!-- SMTP Settings Fields -->
+        <h2>Email Delivery Settings</h2>
+        <form method="POST" action="{{ url_for('update_smtp_settings') }}">
+            <label for="email">Email</label>
+            <input type="email" name="email" id="email" value="{{ user.email or '' }}">
 
-    <!-- Change Username Section -->
-    <h2>Change Username</h2>
-    <p>Current Username: {{ session['username'] }}</p>
-    <form method="POST" action="{{ url_for('change_username') }}">
-        <input type="text" name="new_username" placeholder="New Username" required>
-        <button type="submit">Change Username</button>
-    </form>
+            <label for="smtp_server">SMTP Server</label>
+            <input type="text" name="smtp_server" id="smtp_server" value="{{ user.smtp_server or '' }}">
 
-    <!-- SMTP Settings Fields -->
-    <h2>Email Settings (for message delivery)</h2>
-    <form method="POST" action="{{ url_for('update_smtp_settings') }}">
-        <label for="email">Email:</label>
-        <input type="email" name="email" id="email" value="{{ user.email or '' }}" placeholder="Your email">
+            <label for="smtp_port">SMTP Port</label>
+            <input type="number" name="smtp_port" id="smtp_port" value="{{ user.smtp_port or '' }}">
 
-        <label for="smtp_server">SMTP Server:</label>
-        <input type="text" name="smtp_server" id="smtp_server" value="{{ user.smtp_server or '' }}" placeholder="SMTP server address">
+            <label for="smtp_username">SMTP Username</label>
+            <input type="text" name="smtp_username" id="smtp_username" value="{{ user.smtp_username or '' }}">
 
-        <label for="smtp_port">SMTP Port:</label>
-        <input type="number" name="smtp_port" id="smtp_port" value="{{ user.smtp_port or '' }}" placeholder="SMTP port">
+            <label for="smtp_password">SMTP Password</label>
+            <input type="password" name="smtp_password" id="smtp_password">
 
-        <label for="smtp_username">SMTP Username:</label>
-        <input type="text" name="smtp_username" id="smtp_username" value="{{ user.smtp_username or '' }}" placeholder="SMTP username">
+            <button type="submit">Update Settings</button>
+        </form>
 
-        <label for="smtp_password">SMTP Password:</label>
-        <input type="password" name="smtp_password" id="smtp_password" placeholder="Enter password to change it">
+        <!-- PGP Key Section -->
+        <h2>Public PGP Key</h2>
+        <form method="POST" action="{{ url_for('update_pgp_key') }}">
+            <label for="pgp_key">PGP Key</label>
+            <textarea name="pgp_key" id="pgp_key" placeholder="-----BEGIN PGP PUBLIC KEY BLOCK-----">{{ user.pgp_key or '' }}</textarea>
+            
+            <button type="submit">Update PGP Key</button>
+        </form>
 
-        <button type="submit">Update Settings</button>
-    </form>
-
-    <!-- PGP Key Section -->
-    <h2>Public PGP Key</h2>
-    <form method="POST" action="{{ url_for('update_pgp_key') }}">
-        <textarea name="pgp_key" placeholder="Paste your public PGP key here">{{ user.pgp_key or '' }}</textarea>
-        <button type="submit">Update PGP Key</button>
-    </form>
-
-    <a href="{{ url_for('logout') }}">Logout</a>
+        <a href="{{ url_for('logout') }}">Logout</a>
+    </div>
 {% endblock %}

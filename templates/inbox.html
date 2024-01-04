@@ -2,7 +2,7 @@
 {% block title %}Settings{% endblock %}
 
 {% block content %}
-    <h1>Inbox for {{ username }}</h1>
+    <h1>Inbox for {{ session['username'] }}</h1>
     {% for message in messages %}
         <p>{{ message.content }}</p>
     {% else %}

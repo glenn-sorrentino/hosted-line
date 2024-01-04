@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Settings{% endblock %}
+{% block title %}Send a Message{% endblock %}
 
 {% block content %}
     <h1>Submit a Message to {{ username }}</h1>
     <form method="POST" action="/submit_message/{{ username }}">
-        <label for="content">Message:</label>
+        <label for="content">Message</label>
         <textarea id="content" name="content" required></textarea>
         <button type="submit">Send Message</button>
     </form>
