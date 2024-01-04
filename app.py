@@ -99,7 +99,7 @@ def handle_exception(e):
 # Routes
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return redirect(url_for("login"))
 
 
 @app.route("/register", methods=["GET", "POST"])
@@ -135,6 +135,7 @@ def register():
         return redirect(url_for("register"))
 
     return render_template("register.html")
+
 
 @app.route("/enable-2fa", methods=["GET", "POST"])
 def enable_2fa():
