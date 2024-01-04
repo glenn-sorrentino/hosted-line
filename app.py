@@ -104,37 +104,37 @@ def index():
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
-    if request.method == "POST":
-        username = request.form.get("username")
-        password = request.form.get("password")
-        invite_code = request.form.get("invite_code")
+    try:
+        if request.method == "POST":
+            username = request.form["username"]
+            password = request.form["password"]
+            password_hash = bcrypt.generate_password_hash(password).decode("utf-8")
+            new_user = User(username=username, password_hash=password_hash)
 
-        # Check if invite code is valid
-        valid_code = InviteCode.query.filter_by(code=invite_code, used=False).first()
-        if valid_code is None or valid_code.expiration_date < datetime.utcnow():
-            flash("Invalid or expired invite code.")
-            return redirect(url_for("register"))
+            db.session.add(new_user)
+            db.session.commit()
 
-        # Check for existing user
-        existing_user = User.query.filter_by(username=username).first()
-        if existing_user:
-            flash("Username already exists.")
-            return redirect(url_for("register"))
+            flash("👍 Registration successful! Please log in.")
+            return redirect(
+                url_for("login")
+            )  # Redirect to login page after registration
+    except IntegrityError:  # Catch IntegrityError for duplicate username
+        # Set user_id and username in session
+        session["user_id"] = new_user.id
+        session["username"] = username
 
-        # Create new user with hashed password
-        hashed_password = bcrypt.generate_password_hash(password).decode("utf-8")
-        new_user = User(username=username, password_hash=hashed_password)
-        db.session.add(new_user)
-
-        # Mark invite code as used
-        valid_code.used = True
-        db.session.commit()
-
-        flash("Registration successful! Please log in.")
-        return redirect(url_for("login"))
+        flash("👍 Registration successful! Please log in.")
+        return redirect(url_for("login"))  # Redirect to login page
+    except IntegrityError:
+        db.session.rollback()
+        flash("💔 Username already exists. Please choose a different one.")
+        return redirect(url_for("register"))
+    except Exception as e:
+        app.logger.error(f"Error in registration: {e}", exc_info=True)
+        flash("⛔️ An error occurred during registration. Please try again.")
+        return redirect(url_for("register"))
 
     return render_template("register.html")
-
 
 @app.route("/enable-2fa", methods=["GET", "POST"])
 def enable_2fa():
@@ -150,10 +150,10 @@ def enable_2fa():
             user.totp_secret = temp_totp_secret
             db.session.commit()
             session.pop("temp_totp_secret", None)
-            flash("2FA setup successful. Please log in again with 2FA.")
+            flash("👍 2FA setup successful. Please log in again with 2FA.")
             return redirect(url_for("logout"))  # Redirect to logout
         else:
-            flash("Invalid 2FA code. Please try again.")
+            flash("⛔️ Invalid 2FA code. Please try again.")
             return redirect(url_for("enable_2fa"))
 
     # Generate new 2FA secret and QR code
@@ -185,7 +185,7 @@ def disable_2fa():
     user = db.session.get(User, user_id)
     user.totp_secret = None
     db.session.commit()
-    flash("2FA has been disabled.")
+    flash("🔓 2FA has been disabled.")
     return redirect(url_for("settings"))
 
 
@@ -225,11 +225,11 @@ def verify_2fa_setup():
     verification_code = request.form["verification_code"]
     totp = pyotp.TOTP(user.totp_secret)
     if totp.verify(verification_code):
-        flash("2FA setup successful. Please log in again.")
+        flash("👍 2FA setup successful. Please log in again.")
         session.pop("is_setting_up_2fa", None)
         return redirect(url_for("logout"))
     else:
-        flash("Invalid 2FA code. Please try again.")
+        flash("⛔️ Invalid 2FA code. Please try again.")
         return redirect(url_for("show_qr_code"))
 
 
@@ -253,7 +253,7 @@ def login():
             else:
                 return redirect(url_for("inbox", username=username))
         else:
-            flash("Invalid username or password")
+            flash("⛔️ Invalid username or password")
             app.logger.debug("Login failed: Invalid username or password")
 
     return render_template("login.html")
@@ -266,7 +266,7 @@ def verify_2fa_login():
 
     user = User.query.get(session["user_id"])
     if not user:
-        flash("User not found. Please login again.")
+        flash("⛔️ User not found. Please login again.")
         return redirect(url_for("login"))
 
     if request.method == "POST":
@@ -276,7 +276,7 @@ def verify_2fa_login():
             session["2fa_verified"] = True  # Set 2FA verification flag
             return redirect(url_for("inbox", username=user.username))
         else:
-            flash("Invalid 2FA code. Please try again.")
+            flash("⛔️ Invalid 2FA code. Please try again.")
 
     return render_template("verify_2fa_login.html")
 
@@ -348,9 +348,9 @@ def change_password():
     if bcrypt.check_password_hash(user.password_hash, old_password):
         user.password_hash = bcrypt.generate_password_hash(new_password).decode("utf-8")
         db.session.commit()
-        flash("Password successfully changed.")
+        flash("👍 Password successfully changed.")
     else:
-        flash("Incorrect old password.")
+        flash("⛔️ Incorrect old password.")
 
     return redirect(url_for("settings"))
 
@@ -369,9 +369,9 @@ def change_username():
         user.username = new_username
         db.session.commit()
         session["username"] = new_username  # Update username in session
-        flash("Username successfully changed.")
+        flash("👍 Username successfully changed.")
     else:
-        flash("This username is already taken.")
+        flash("💔 This username is already taken.")
 
     return redirect(url_for("settings"))
 
@@ -385,12 +385,15 @@ def logout():
 
 @app.route("/submit_message/<username>", methods=["GET", "POST"])
 def submit_message(username):
-    if request.method == "POST":
-        user = User.query.filter_by(username=username).first()
-        if not user:
-            flash("User not found")
-            return redirect(url_for("submit_message", username=username))
+    # Fetch the user object based on the username
+    user = User.query.filter_by(username=username).first()
+    if not user:
+        flash("User not found")
+        return redirect(
+            url_for("index")
+        )  # Redirect to a suitable page if user not found
 
+    if request.method == "POST":
         content = request.form["content"]
         email_content = content  # Default to original content
         email_sent = False  # Flag to track email sending status
@@ -401,7 +404,7 @@ def submit_message(username):
                 message = Message(content=encrypted_content, user_id=user.id)
                 email_content = encrypted_content  # Use encrypted content for email
             else:
-                flash("Failed to encrypt message with PGP key.")
+                flash("⛔️ Failed to encrypt message with PGP key.")
                 return redirect(url_for("submit_message", username=username))
         else:
             message = Message(content=content, user_id=user.id)
@@ -421,13 +424,14 @@ def submit_message(username):
 
         # Custom flash message for both scenarios
         if email_sent:
-            flash("Message submitted and emailed")
+            flash("📥 Message submitted and emailed")
         else:
-            flash("Message submitted")
+            flash("📥 Message submitted")
 
         return redirect(url_for("submit_message", username=username))
 
-    return render_template("submit_message.html", username=username)
+    # Include the user variable when rendering the template
+    return render_template("submit_message.html", username=username, user=user)
 
 
 def send_email(recipient, subject, body, user):
@@ -477,21 +481,21 @@ def update_pgp_key():
     """
     user_id = session.get("user_id")
     if not user_id:
-        flash("User not authenticated.")
+        flash("⛔️ User not authenticated.")
         return redirect(url_for("login"))
 
     user = db.session.get(User, user_id)
     if not user:
-        flash("User not found.")
+        flash("⛔️ User not found.")
         return redirect(url_for("settings"))
 
     pgp_key = request.form.get("pgp_key")
     if pgp_key and is_valid_pgp_key(pgp_key):
         user.pgp_key = pgp_key
         db.session.commit()
-        flash("PGP key updated successfully.")
+        flash("👍 PGP key updated successfully.")
     else:
-        flash("Invalid PGP key format or import failed.")
+        flash("⛔️ Invalid PGP key format or import failed.")
 
     return redirect(url_for("settings"))
 
@@ -537,7 +541,7 @@ def update_smtp_settings():
 
     user = db.session.get(User, user_id)
     if not user:
-        flash("User not found")
+        flash("⛔️ User not found")
         return redirect(url_for("settings"))
 
     # Updating SMTP settings from form data
@@ -548,7 +552,7 @@ def update_smtp_settings():
     user.smtp_password = request.form.get("smtp_password")
 
     db.session.commit()
-    flash("SMTP settings updated successfully")
+    flash("👍 SMTP settings updated successfully")
     return redirect(url_for("settings"))
 
     msg.attach(MIMEText(body, "plain"))
