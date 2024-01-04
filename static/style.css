@@ -53,6 +53,34 @@ h2 + p {
 	margin-bottom: .5rem;
 }
 
+a {
+	color: #7D25C1;
+}
+
+p {
+	word-break: break-word;
+}
+
+.flash-messages {
+	position: fixed;
+	top: 1rem;
+	right: 50%;
+	transform: translateX(50%);
+	background-color: white;
+	outline: 1px solid rgba(0,0,0,0.1);
+	padding: 1.25rem 2rem;
+	border-radius: .5rem;
+	box-shadow: 0px 4px 12px -4px rgba(0,0,0,0.15);
+}
+
+p.message {
+	border: 1px solid rgba(0,0,0,0.1);
+	padding: 1.5rem;
+	border-radius: .25rem;
+	box-shadow: 0px 4px 8px -4px rgba(0,0,0,0.1);
+	margin: .5rem 0;
+}
+
 .mono {
 	font-family: 'IBM Plex Mono', monospace;
 	font-size: .925rem;
@@ -97,6 +125,16 @@ header nav ul {
 
 header nav li {
 	list-style: none;
+	font-size: .875rem;
+}
+
+header nav a {
+	text-decoration: none;
+	color: #333;
+}
+
+header nav a:hover {
+	text-decoration: underline;
 }
 
 .container {
@@ -133,6 +171,10 @@ label {
 p.meta {
 	font-size: .875rem;
 	color: #595959;
+}
+
+h1 + p.meta {
+	margin-bottom: 1rem;
 }
 
 input, textarea {
@@ -174,6 +216,11 @@ button {
 	color: white;
 	padding: 0 1rem;
 	margin: .5rem 0;
+}
+
+input[type="submit"]:hover,
+button:hover {
+	cursor: pointer;
 }
 
 textarea {
