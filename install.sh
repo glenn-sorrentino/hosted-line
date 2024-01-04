@@ -24,10 +24,8 @@ cd hushline-hosted
 mkdir ~/.gnupg
 chmod 700 ~/.gnupg
 
-# Create a Python virtual environment
+# Create and activate Python virtual environment
 python3 -m venv venv
-
-# Activate the virtual environment
 source venv/bin/activate
 
 # Install Flask, Gunicorn, and other Python libraries
