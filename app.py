@@ -10,6 +10,9 @@ import pyotp
 import qrcode
 import io
 import base64
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 # Load environment variables
 load_dotenv()
@@ -44,6 +47,11 @@ class User(db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(128))
     totp_secret = db.Column(db.String(100))
+    email = db.Column(db.String(255))
+    smtp_server = db.Column(db.String(255))
+    smtp_port = db.Column(db.Integer)
+    smtp_username = db.Column(db.String(255))
+    smtp_password = db.Column(db.String(255))
 
 class Message(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -310,12 +318,43 @@ def submit_message(username):
             message = Message(content=content, user_id=user.id)
             db.session.add(message)
             db.session.commit()
-            flash('Message sent successfully!')  # Flash a success message
+
+            # Check if user has provided email settings
+            if user.email and user.smtp_server and user.smtp_port and user.smtp_username and user.smtp_password:
+                # Send email
+                if send_email(user.email, "New Message", content, user):
+                    flash('Message sent successfully via email!')
+                else:
+                    flash('Message sent but failed to send via email.')
+            else:
+                flash('Message sent successfully!')
+            
             return redirect(url_for('submit_message', username=username))
         else:
-            flash('User not found')  # Flash an error message
+            flash('User not found')
             return redirect(url_for('submit_message', username=username))
+    
     return render_template('submit_message.html', username=username)
+
+def send_email(recipient, subject, body, user):
+    msg = MIMEMultipart()
+    msg['From'] = user.smtp_username
+    msg['To'] = recipient
+    msg['Subject'] = subject
+
+    msg.attach(MIMEText(body, 'plain'))
+
+    try:
+        with smtplib.SMTP(user.smtp_server, user.smtp_port) as server:
+            server.starttls()
+            server.login(user.smtp_username, user.smtp_password)
+            text = msg.as_string()
+            server.sendmail(user.smtp_username, recipient, text)
+        return True
+    except Exception as e:
+        # Log the exception
+        app.logger.error(f"Error sending email: {e}")
+        return False
 
 if __name__ == '__main__':
     with app.app_context():
