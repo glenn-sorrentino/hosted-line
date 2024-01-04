@@ -323,10 +323,14 @@ def submit_message(username):
             return redirect(url_for('submit_message', username=username))
 
         content = request.form['content']
+        email_content = content  # Default to original content
+        email_sent = False  # Flag to track email sending status
+
         if user.pgp_key:
             encrypted_content = encrypt_message(content, 'tips@scidsg.org')
             if encrypted_content:
                 message = Message(content=encrypted_content, user_id=user.id)
+                email_content = encrypted_content  # Use encrypted content for email
             else:
                 flash('Failed to encrypt message with PGP key.')
                 return redirect(url_for('submit_message', username=username))
@@ -335,30 +339,45 @@ def submit_message(username):
 
         db.session.add(message)
         db.session.commit()
-        flash('Message sent successfully!')
+
+        # Checking if SMTP settings are configured
+        if user.email and user.smtp_server and user.smtp_port and user.smtp_username and user.smtp_password:
+            email_sent = send_email(user.email, "New Message", email_content, user)
+
+        # Custom flash message for both scenarios
+        if email_sent:
+            flash("Message submitted and emailed")
+        else:
+            flash("Message submitted")
+
         return redirect(url_for('submit_message', username=username))
 
-    # Default GET request handling
     return render_template('submit_message.html', username=username)
 
 def send_email(recipient, subject, body, user):
     app.logger.debug(f"Preparing to send email to {recipient}")
+    app.logger.debug(f"SMTP settings being used: Server: {user.smtp_server}, Port: {user.smtp_port}, Username: {user.smtp_username}, Email: {user.email}")
+
     msg = MIMEMultipart()
     msg['From'] = user.email
     msg['To'] = recipient
     msg['Subject'] = subject
-
     msg.attach(MIMEText(body, 'plain'))
 
     try:
+        app.logger.debug("Attempting to connect to SMTP server")
         with smtplib.SMTP(user.smtp_server, user.smtp_port) as server:
-            server.set_debuglevel(1)  # Enable debug output for the SMTP session
+            app.logger.debug("Starting TLS")
             server.starttls()
+
+            app.logger.debug("Attempting to log in to SMTP server")
             server.login(user.smtp_username, user.smtp_password)
+
+            app.logger.debug("Sending email")
             text = msg.as_string()
             server.sendmail(user.email, recipient, text)
-        app.logger.info("Email sent successfully.")
-        return True
+            app.logger.info("Email sent successfully.")
+            return True
     except Exception as e:
         app.logger.error(f"Error sending email: {e}", exc_info=True)
         return False
