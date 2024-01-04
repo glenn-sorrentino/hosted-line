@@ -104,35 +104,35 @@ def index():
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
-    try:
-        if request.method == "POST":
-            username = request.form["username"]
-            password = request.form["password"]
-            password_hash = bcrypt.generate_password_hash(password).decode("utf-8")
-            new_user = User(username=username, password_hash=password_hash)
+    if request.method == "POST":
+        username = request.form.get("username")
+        password = request.form.get("password")
+        invite_code_input = request.form.get("invite_code")
 
-            db.session.add(new_user)
-            db.session.commit()
+        # Validate the invite code
+        invite_code = InviteCode.query.filter_by(
+            code=invite_code_input, used=False
+        ).first()
+        if not invite_code or invite_code.expiration_date < datetime.utcnow():
+            flash("⛔️ Invalid or expired invite code.", "error")
+            return redirect(url_for("register"))
 
-            flash("👍 Registration successful! Please log in.")
-            return redirect(
-                url_for("login")
-            )  # Redirect to login page after registration
-    except IntegrityError:  # Catch IntegrityError for duplicate username
-        # Set user_id and username in session
-        session["user_id"] = new_user.id
-        session["username"] = username
+        # Check for existing username
+        if User.query.filter_by(username=username).first():
+            flash("💔 Username already taken.", "error")
+            return redirect(url_for("register"))
 
-        flash("👍 Registration successful! Please log in.")
-        return redirect(url_for("login"))  # Redirect to login page
-    except IntegrityError:
-        db.session.rollback()
-        flash("💔 Username already exists. Please choose a different one.")
-        return redirect(url_for("register"))
-    except Exception as e:
-        app.logger.error(f"Error in registration: {e}", exc_info=True)
-        flash("⛔️ An error occurred during registration. Please try again.")
-        return redirect(url_for("register"))
+        # Hash the password and create the user
+        password_hash = bcrypt.generate_password_hash(password).decode("utf-8")
+        new_user = User(username=username, password_hash=password_hash)
+        db.session.add(new_user)
+
+        # Mark the invite code as used
+        invite_code.used = True
+        db.session.commit()
+
+        flash("👍 Registration successful! Please log in.", "success")
+        return redirect(url_for("login"))
 
     return render_template("register.html")
 
@@ -288,23 +288,16 @@ def inbox(username):
         f"Session Username: {session.get('username')}, URL Username: {username}"
     )
 
-    if "user_id" not in session:
-        app.logger.debug("No user_id in session")
-        return "Unauthorized", 401
-    if session.get("username") != username:
-        app.logger.debug("Session username does not match URL username")
-        return "Unauthorized", 401
+    # Redirect to login if not logged in or if session username doesn't match URL username
+    if "user_id" not in session or session.get("username") != username:
+        app.logger.debug("Unauthorized access attempt to inbox.")
+        return redirect(url_for("login"))
 
     user = User.query.filter_by(username=username).first()
     if not user:
         app.logger.debug("No user found with this username")
-        return "Unauthorized", 401
-    app.logger.debug(
-        f"Session User ID: {session.get('user_id')}, DB User ID: {user.id}"
-    )
-    if session["user_id"] != user.id:
-        app.logger.debug("Session user_id does not match DB user ID")
-        return "Unauthorized", 401
+        flash("User not found.")
+        return redirect(url_for("login"))
 
     messages = Message.query.filter_by(user_id=user.id).all()
     return render_template("inbox.html", messages=messages, user=user)
