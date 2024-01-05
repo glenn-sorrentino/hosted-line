@@ -18,7 +18,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import gnupg
 from flask_wtf import FlaskForm
 from wtforms import TextAreaField, StringField, PasswordField, IntegerField
-from wtforms.validators import DataRequired, Length
+from wtforms.validators import DataRequired, Length, Email
 
 # Load environment variables
 load_dotenv()
