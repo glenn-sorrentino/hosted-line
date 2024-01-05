@@ -119,6 +119,11 @@ header h1 {
 	font-size: 1.25rem;
 }
 
+header nav {
+	display: flex;
+	align-items: center;
+}
+
 header nav ul {
 	display: flex;
 	gap: 1.5rem;
@@ -160,9 +165,8 @@ h1.submit {
 	margin-bottom: .5rem;
 }
 
-header .btn {
-	padding: .625rem .825rem;
-	font-size: .875rem;
+header nav .mobileNav {
+	display: none;
 }
 
 label {
@@ -174,6 +178,8 @@ label {
 p.meta {
 	font-size: .875rem;
 	color: #595959;
+	display: flex;
+	align-items: center;
 }
 
 h1 + p.meta {
@@ -223,6 +229,14 @@ button,
 	margin: .5rem 0;
 }
 
+header .btn {
+	padding: .625rem .825rem;
+	font-size: .875rem;
+	margin-left: 1rem;
+	min-width: initial;
+	min-height: initial;
+}
+
 .formBody input[type="submit"],
 .formBody button,
 .btn {
@@ -231,6 +245,11 @@ button,
 	border: 1px solid #7D25C1;
 	border-radius: 50vw;
 	font-family: 'Atkinson Bold', sans-serif;
+}
+
+.mobileNav {
+	background-image: url('icon-menu.png');
+	background-size: contain;
 }
 
 .btn .emoji {
@@ -247,8 +266,16 @@ textarea {
 	height: 240px;
 }
 
-@media only screen and (max-width: 480px) {
+@media only screen and (max-width: 640px) {
 	.container {
 		min-width: initial;
+	}
+
+	header nav ul {
+		display: none;
+	}
+
+	header nav .mobileNav {
+		display: initial;
 	}
 }

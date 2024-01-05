@@ -4,7 +4,7 @@
 {% block content %}
     <h1 class="submit">Submit a Message to {{ username }}</h1>
     {% if user.pgp_key %}
-        <p class="meta"><img src="{{ url_for('static', filename='shield.png') }}"> Your message will be encrypted and only readable by {{ username }}</p>
+        <p class="meta">🔐 Your message will be encrypted and only readable by {{ username }}.</p>
         {% else %}
             <p class="meta">⚠️ Your message will NOT be encrypted. If this message is sensitive, ask {{ username }} to add a public PGP key.</p>
         {% endif %}

@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}{% endblock %} - Hushline</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
@@ -11,20 +12,22 @@
         <h1>🤫 Hush Line</h1>
         {% if 'user_id' in session and 'username' in session %}
             <nav>
+                <a class="mobileNav btnIcon" aria-label="Navigation menu">Menu</a>
                 <ul>
                     <li><a href="{{ url_for('inbox', username=session.username) }}">Inbox</a></li>
                     <li><a href="{{ url_for('submit_message', username=session.username) }}">Submit Message</a></li>
                     <li><a href="{{ url_for('settings') }}">@{{ session['username'] }}</a></li>
-                    <li><a class="btn" href="https://opencollective.com/scidsg/"><span class="emoji">❤️</span> Donate</a></li>
                 </ul>
+                <a class="btn" href="https://opencollective.com/scidsg/"><span class="emoji">❤️</span> Donate</a>
             </nav>
             {% else %}
             <nav>
+                <a class="mobileNav btnIcon" aria-label="Navigation menu">Menu</a>
                 <ul>
                     <li><a href="{{ url_for('login') }}">Login</a></li>
                     <li><a href="{{ url_for('register') }}">Register</a></li>
-                    <li><a class="btn" href="https://opencollective.com/scidsg/"><span class="emoji">❤️</span> Donate</a></li>
                 </ul>
+                <a class="btn" href="https://opencollective.com/scidsg/"><span class="emoji">❤️</span> Donate</a>
             </nav>
             {% endif %}
     </header>
