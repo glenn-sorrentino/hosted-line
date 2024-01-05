@@ -155,11 +155,9 @@ header nav a:hover {
 	margin-bottom: 2rem;
 }
 
-.formBody input[type="submit"],
-.formBody button {
-	background-color: white;
-	color: #7D25C1;
-	border: 1px solid #7D25C1;;
+header .btn {
+	padding: .5rem .75rem;
+	font-size: .875rem;
 }
 
 label {
@@ -205,7 +203,8 @@ input + button {
 }
 
 input[type="submit"],
-button {
+button,
+.btn {
 	min-height: 44px;
 	min-width: 120px;
 	font-size: 1rem;
@@ -216,6 +215,21 @@ button {
 	color: white;
 	padding: 0 1rem;
 	margin: .5rem 0;
+}
+
+.formBody input[type="submit"],
+.formBody button,
+.btn {
+	background-color: white;
+	color: #7D25C1;
+	border: 1px solid #7D25C1;
+	border-radius: 50vw;
+	font-family: 'Atkinson Bold', sans-serif;
+}
+
+.btn .emoji {
+	transform: scale(.8);
+	display: inline-flex;
 }
 
 input[type="submit"]:hover,

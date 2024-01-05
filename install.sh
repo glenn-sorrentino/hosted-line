@@ -25,7 +25,7 @@ DB_USER=$(whiptail --inputbox "Enter the database username" 8 39 "hushlineuser" 
 DB_PASS=$(whiptail --passwordbox "Enter the database password" 8 39 "dbpassword" --title "Database Setup" 3>&1 1>&2 2>&3)
 
 # Install Python, pip, Git, Nginx, and MariaDB
-sudo apt install python3 python3-pip git nginx default-mysql-server python3-venv gnupg tor certbot python3-certbot-nginx libnginx-mod-http-geoip -y
+sudo apt install python3 python3-pip git nginx default-mysql-server python3-venv gnupg tor certbot python3-certbot-nginx libnginx-mod-http-geoip ufw fail2ban -y
 
 ############################
 # Server, Nginx, HTTPS setup
@@ -189,8 +189,8 @@ SERVER_IP=$(curl -s ifconfig.me)
 WIDTH=$(tput cols)
 whiptail --msgbox --title "Instructions" "\nPlease ensure that your DNS records are correctly set up before proceeding:\n\nAdd an A record with the name: @ and content: $SERVER_IP\n* Add a CNAME record with the name $SAUTEED_ONION_ADDRESS.$DOMAIN and content: $DOMAIN\n* Add a CAA record with the name: @ and content: 0 issue \"letsencrypt.org\"\n" 14 $WIDTH
 # Request the certificates
-echo "⏲️  Waiting 2 minutes for DNS to update..."
-# sleep 120
+echo "⏲️  Waiting 1 minute for DNS to update..."
+sleep 60
 certbot --nginx -d $DOMAIN,$SAUTEED_ONION_ADDRESS.$DOMAIN --agree-tos --non-interactive --no-eff-email --email ${EMAIL}
 
 echo "Configuring automatic renewing certificates..."
@@ -280,4 +280,57 @@ sudo systemctl restart nginx
 # Start and enable Nginx
 sudo systemctl enable nginx
 
-echo "Installation and configuration complete."
+# Enable the "security" and "updates" repositories
+echo "Configuring unattended-upgrades..."
+cp assets/50unattended-upgrades /etc/apt/apt.conf.d
+cp assets/20auto-upgrades /etc/apt/apt.conf.d
+
+systemctl restart unattended-upgrades
+
+echo "✅ Automatic updates have been installed and configured."
+
+# Configure Fail2Ban
+
+echo "Configuring fail2ban..."
+
+systemctl start fail2ban
+systemctl enable fail2ban
+cp /etc/fail2ban/jail.{conf,local}
+
+# Configure fail2ban
+cp assets/jail.local /etc/fail2ban
+
+systemctl restart fail2ban
+
+echo "✅ Fail2Ban configuration complete."
+
+# Configure UFW (Uncomplicated Firewall)
+
+echo "Configuring UFW..."
+
+# Default rules
+ufw default deny incoming
+ufw default allow outgoing
+ufw allow 80/tcp
+ufw allow 443/tcp
+
+# Allow SSH (modify as per your requirements)
+ufw allow ssh
+ufw limit ssh/tcp
+
+# Enable UFW non-interactively
+echo "y" | ufw enable
+
+echo "✅ UFW configuration complete."
+
+echo "
+✅ Hush Line installation complete! Access your site at these addresses:
+                                               
+https://$DOMAIN
+https://$SAUTEED_ONION_ADDRESS.$DOMAIN;
+http://$ONION_ADDRESS
+"
+
+echo "⏲️ Rebooting in 10 seconds..."
+sleep 10
+reboot
