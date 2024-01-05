@@ -2,10 +2,10 @@
 {% block title %}Settings{% endblock %}
 
 {% block content %}
-    <h1>📥 Inbox for {{ session['username'] }}</h1>
+    <h1>Inbox for {{ session['username'] }}</h1>
     {% for message in messages %}
         <p class="message">{{ message.content }}</p>
     {% else %}
-        <p>No messages yet.</p>
+        <p class="message">No messages yet.</p>
     {% endfor %}
 {% endblock %}

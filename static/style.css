@@ -79,6 +79,7 @@ p.message {
 	border-radius: .25rem;
 	box-shadow: 0px 4px 8px -4px rgba(0,0,0,0.1);
 	margin: .5rem 0;
+	background-color: white;
 }
 
 .mono {
@@ -152,7 +153,11 @@ header nav a:hover {
 }
 
 .container h1 {
-	margin-bottom: 2rem;
+	margin-bottom: 1.5rem;
+}
+
+h1.submit {
+	margin-bottom: .5rem;
 }
 
 header .btn {
@@ -172,7 +177,8 @@ p.meta {
 }
 
 h1 + p.meta {
-	margin-bottom: 1rem;
+	margin-bottom: 1.5rem;
+	margin-top: 0;
 }
 
 input, textarea {
