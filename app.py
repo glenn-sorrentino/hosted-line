@@ -17,7 +17,7 @@ from email.mime.multipart import MIMEMultipart
 from werkzeug.security import generate_password_hash, check_password_hash
 import gnupg
 from flask_wtf import FlaskForm
-from wtforms import TextAreaField, StringField, PasswordField
+from wtforms import TextAreaField, StringField, PasswordField, IntegerField
 from wtforms.validators import DataRequired, Length
 
 # Load environment variables
@@ -130,6 +130,33 @@ class TwoFactorForm(FlaskForm):
     verification_code = StringField(
         "Verification Code", validators=[DataRequired(), Length(min=6, max=6)]
     )
+
+
+class ChangePasswordForm(FlaskForm):
+    old_password = PasswordField("Old Password", validators=[DataRequired()])
+    new_password = PasswordField(
+        "New Password", validators=[DataRequired(), Length(min=6)]
+    )
+
+
+class ChangeUsernameForm(FlaskForm):
+    new_username = StringField(
+        "New Username", validators=[DataRequired(), Length(min=4, max=25)]
+    )
+
+
+class SMTPSettingsForm(FlaskForm):
+    email = StringField("Email", validators=[DataRequired(), Email()])
+    smtp_server = StringField("SMTP Server", validators=[DataRequired()])
+    smtp_port = IntegerField("SMTP Port", validators=[DataRequired()])
+    smtp_username = StringField("SMTP Username", validators=[DataRequired()])
+    smtp_password = PasswordField("SMTP Password", validators=[DataRequired()])
+
+
+class PGPKeyForm(FlaskForm):
+    pgp_key = TextAreaField(
+        "PGP Key", validators=[DataRequired(), Length(min=50)]
+    )  # Adjust minimum length as necessary
 
 
 # Error Handler
@@ -382,7 +409,22 @@ def settings():
     if user.totp_secret and not session.get("2fa_verified", False):
         return redirect(url_for("verify_2fa_login"))
 
-    return render_template("settings.html", user=user)
+    # Create form instances
+    change_password_form = ChangePasswordForm()
+    change_username_form = ChangeUsernameForm()
+    smtp_settings_form = SMTPSettingsForm()
+    pgp_key_form = PGPKeyForm()
+
+    # Add more logic here if needed for form submissions
+
+    return render_template(
+        "settings.html",
+        user=user,
+        change_password_form=change_password_form,
+        change_username_form=change_username_form,
+        smtp_settings_form=smtp_settings_form,
+        pgp_key_form=pgp_key_form,
+    )
 
 
 @app.route("/toggle-2fa", methods=["POST"])
