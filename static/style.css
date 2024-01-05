@@ -166,7 +166,7 @@ header nav a:hover {
 }
 
 h1.submit {
-	margin-bottom: .5rem;
+	margin-bottom: 1rem;
 }
 
 header nav .mobileNav {
@@ -236,7 +236,7 @@ button,
 header .btn {
 	padding: .625rem .825rem;
 	font-size: .875rem;
-	margin-left: .5rem;
+	margin-left: 1rem;
 	min-width: initial;
 	min-height: initial;
 }
@@ -301,6 +301,10 @@ a.logoutLink {
 		display: flex;
 		flex-direction: row;
 		cursor: pointer;
+	}
+
+	header .btn {
+		margin-left: .5rem;
 	}
 
 	header nav ul.show {

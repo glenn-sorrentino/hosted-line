@@ -81,7 +81,7 @@ server {
         add_header X-Frame-Options DENY;
         add_header X-Content-Type-Options nosniff;
         add_header Onion-Location http://$ONION_ADDRESS\$request_uri;
-        add_header Content-Security-Policy "default-src 'self'; script-src 'self'; img-src 'self' https:; style-src 'self'; frame-ancestors 'none';";
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self'; img-src 'self' data: https:; style-src 'self'; frame-ancestors 'none';";
         add_header Permissions-Policy "geolocation=(), midi=(), notifications=(), push=(), sync-xhr=(), microphone=(), camera=(), magnetometer=(), gyroscope=(), speaker=(), vibrate=(), fullscreen=(), payment=(), interest-cohort=()";
         add_header Referrer-Policy "no-referrer";
         add_header X-XSS-Protection "1; mode=block";
@@ -94,7 +94,7 @@ server {
                 
         add_header X-Frame-Options DENY;
         add_header X-Content-Type-Options nosniff;
-        add_header Content-Security-Policy "default-src 'self'; script-src 'self'; img-src 'self' https:; style-src 'self'; frame-ancestors 'none';";
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self'; img-src 'self' data: https:; style-src 'self'; frame-ancestors 'none';";
         add_header Permissions-Policy "geolocation=(), midi=(), notifications=(), push=(), sync-xhr=(), microphone=(), camera=(), magnetometer=(), gyroscope=(), speaker=(), vibrate=(), fullscreen=(), payment=(), interest-cohort=()";
         add_header Referrer-Policy "no-referrer";
         add_header X-XSS-Protection "1; mode=block";
@@ -227,6 +227,15 @@ sudo systemctl start mariadb
 # Secure MariaDB Installation
 sudo mysql_secure_installation
 
+# Create an override file for MariaDB to restart on failure
+echo "Creating MariaDB service override..."
+sudo mkdir -p /etc/systemd/system/mariadb.service.d
+echo -e "[Service]\nRestart=on-failure\nRestartSec=5s" | sudo tee /etc/systemd/system/mariadb.service.d/override.conf
+
+# Reload the systemd daemon and restart MariaDB to apply changes
+sudo systemctl daemon-reload
+sudo systemctl restart mariadb
+
 # Check if the database exists, create if not
 if ! sudo mysql -sse "SELECT EXISTS(SELECT 1 FROM information_schema.schemata WHERE schema_name = '$DB_NAME')" | grep -q 1; then
     sudo mysql -e "CREATE DATABASE $DB_NAME;"
@@ -267,6 +276,11 @@ ExecStart=$WORKING_DIR/venv/bin/gunicorn --workers 2 --bind unix:$WORKING_DIR/hu
 [Install]
 WantedBy=multi-user.target
 EOF
+
+# Create an override file for the Hushline service to restart on failure
+echo "Creating Hushline service override..."
+sudo mkdir -p /etc/systemd/system/hushline-hosted.service.d
+echo -e "[Service]\nRestart=on-failure\nRestartSec=5s" | sudo tee /etc/systemd/system/hushline-hosted.service.d/override.conf
 
 # Start and enable the Flask app service
 sudo systemctl daemon-reload
