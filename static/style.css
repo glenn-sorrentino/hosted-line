@@ -220,6 +220,11 @@ input, textarea {
 	font-family: 'Atkinson Hyperlegible', sans-serif;
 }
 
+textarea#pgp_key {
+	font-family: 'IBM Plex Mono', monospace;
+ 	font-size: .8125rem;
+}
+
 input:focus,
 input[type="submit"],
 textarea:focus,
