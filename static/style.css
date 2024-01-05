@@ -21,7 +21,7 @@ body {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
-	padding: 7rem 1rem 2rem 1rem;
+	padding: 7rem 1rem 1rem 1rem;
 	position: relative;
 	margin: 0;
 	font-family: 'Atkinson Hyperlegible', sans-serif;
@@ -80,6 +80,10 @@ p.message {
 	box-shadow: 0px 4px 8px -4px rgba(0,0,0,0.1);
 	margin: .5rem 0;
 	background-color: white;
+}
+
+p.message:last-of-type {
+	margin-bottom: 0;
 }
 
 .mono {
@@ -232,7 +236,7 @@ button,
 header .btn {
 	padding: .625rem .825rem;
 	font-size: .875rem;
-	margin-left: 1rem;
+	margin-left: .5rem;
 	min-width: initial;
 	min-height: initial;
 }
@@ -250,6 +254,12 @@ header .btn {
 .mobileNav {
 	background-image: url('icon-menu.png');
 	background-size: contain;
+	width: 2.5rem;
+	height: 2.5rem;
+	background-repeat: no-repeat;
+	padding-left: 2.5rem;
+	align-items: center;
+	font-size: .875rem;
 }
 
 .btn .emoji {
@@ -266,9 +276,19 @@ textarea {
 	height: 240px;
 }
 
+a.logoutLink {
+	margin-bottom: 1rem;
+	display: flex;
+}
+
 @media only screen and (max-width: 640px) {
+	body {
+		padding-top: 5.5rem;
+	}
+
 	.container {
 		min-width: initial;
+		padding: 2rem 1rem 1rem 1rem;
 	}
 
 	header nav ul {
@@ -277,5 +297,26 @@ textarea {
 
 	header nav .mobileNav {
 		display: initial;
+		align-content: center;
+		display: flex;
+		flex-direction: row;
+		cursor: pointer;
+	}
+
+	header nav ul.show {
+		display: flex;
+		flex-direction: column;
+		position: absolute;
+		top: 3rem;
+		right: 4rem;
+		background-color: white;
+		width: fit-content;
+		box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+		padding: 1rem;
+		box-sizing: border-box;
+		z-index: 100;
+		border-radius: .25rem;
+		outline: 1px solid rgba(0,0,0,0.1);
+		min-width: 140px;
 	}
 }

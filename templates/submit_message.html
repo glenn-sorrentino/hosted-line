@@ -2,7 +2,7 @@
 {% block title %}Send a Message{% endblock %}
 
 {% block content %}
-    <h1 class="submit">Submit a Message to {{ username }}</h1>
+    <h1 class="submit">Submit a message to {{ username }}</h1>
     {% if user.pgp_key %}
         <p class="meta">🔐 Your message will be encrypted and only readable by {{ username }}.</p>
         {% else %}
