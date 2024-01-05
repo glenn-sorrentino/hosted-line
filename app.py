@@ -17,7 +17,7 @@ from email.mime.multipart import MIMEMultipart
 from werkzeug.security import generate_password_hash, check_password_hash
 import gnupg
 from flask_wtf import FlaskForm
-from wtforms import TextAreaField
+from wtforms import TextAreaField, StringField, PasswordField
 from wtforms.validators import DataRequired, Length
 
 # Load environment variables
@@ -97,6 +97,41 @@ class MessageForm(FlaskForm):
     )  # Adjust max length as needed
 
 
+class LoginForm(FlaskForm):
+    username = StringField("Username", validators=[DataRequired()])
+    password = PasswordField("Password", validators=[DataRequired()])
+
+
+class TwoFactorForm(FlaskForm):
+    verification_code = StringField(
+        "2FA Code", validators=[DataRequired(), Length(min=6, max=6)]
+    )
+
+
+class TwoFactorForm(FlaskForm):
+    verification_code = StringField(
+        "2FA Code", validators=[DataRequired(), Length(min=6, max=6)]
+    )
+
+
+class RegistrationForm(FlaskForm):
+    username = StringField(
+        "Username", validators=[DataRequired(), Length(min=4, max=25)]
+    )
+    password = PasswordField(
+        "Password", validators=[DataRequired(), Length(min=6, max=40)]
+    )
+    invite_code = StringField(
+        "Invite Code", validators=[DataRequired(), Length(min=6, max=25)]
+    )
+
+
+class TwoFactorForm(FlaskForm):
+    verification_code = StringField(
+        "Verification Code", validators=[DataRequired(), Length(min=6, max=6)]
+    )
+
+
 # Error Handler
 @app.errorhandler(Exception)
 def handle_exception(e):
@@ -108,15 +143,27 @@ def handle_exception(e):
 # Routes
 @app.route("/")
 def index():
-    return redirect(url_for("login"))
+    if "user_id" in session:
+        user = User.query.get(session["user_id"])
+        if user:
+            return redirect(url_for("inbox", username=user.username))
+        else:
+            # Handle case where user ID in session does not exist in the database
+            flash("User not found. Please log in again.")
+            session.pop("user_id", None)  # Clear the invalid user_id from session
+            return redirect(url_for("login"))
+    else:
+        return redirect(url_for("login"))
 
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
-    if request.method == "POST":
-        username = request.form.get("username")
-        password = request.form.get("password")
-        invite_code_input = request.form.get("invite_code")
+    form = RegistrationForm()
+
+    if form.validate_on_submit():
+        username = form.username.data
+        password = form.password.data
+        invite_code_input = form.invite_code.data
 
         # Validate the invite code
         invite_code = InviteCode.query.filter_by(
@@ -143,7 +190,7 @@ def register():
         flash("👍 Registration successful! Please log in.", "success")
         return redirect(url_for("login"))
 
-    return render_template("register.html")
+    return render_template("register.html", form=form)
 
 
 @app.route("/enable-2fa", methods=["GET", "POST"])
@@ -153,8 +200,10 @@ def enable_2fa():
         return redirect(url_for("login"))
 
     user = User.query.get(user_id)
-    if request.method == "POST":
-        verification_code = request.form["verification_code"]
+    form = TwoFactorForm()
+
+    if form.validate_on_submit():
+        verification_code = form.verification_code.data
         temp_totp_secret = session.get("temp_totp_secret")
         if temp_totp_secret and pyotp.TOTP(temp_totp_secret).verify(verification_code):
             user.totp_secret = temp_totp_secret
@@ -182,7 +231,10 @@ def enable_2fa():
 
     # Pass the text-based pairing code to the template
     return render_template(
-        "enable_2fa.html", qr_code_img=qr_code_img, text_code=temp_totp_secret
+        "enable_2fa.html",
+        form=form,
+        qr_code_img=qr_code_img,
+        text_code=temp_totp_secret,
     )
 
 
@@ -210,6 +262,8 @@ def show_qr_code():
     if not user or not user.totp_secret:
         return redirect(url_for("enable_2fa"))
 
+    form = TwoFactorForm()
+
     totp_uri = pyotp.totp.TOTP(user.totp_secret).provisioning_uri(
         name=user.username, issuer_name="Hush Line"
     )
@@ -217,12 +271,15 @@ def show_qr_code():
 
     # Convert QR code to a data URI
     buffered = io.BytesIO()
-    img.save(buffered)  # Removed the 'format' argument
+    img.save(buffered)
     img_str = base64.b64encode(buffered.getvalue()).decode()
     qr_code_img = f"data:image/png;base64,{img_str}"
 
     return render_template(
-        "show_qr_code.html", qr_code_img=qr_code_img, user_secret=user.totp_secret
+        "show_qr_code.html",
+        form=form,
+        qr_code_img=qr_code_img,
+        user_secret=user.totp_secret,
     )
 
 
@@ -245,9 +302,10 @@ def verify_2fa_setup():
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    if request.method == "POST":
-        username = request.form["username"]
-        password = request.form["password"]
+    form = LoginForm()
+    if form.validate_on_submit():
+        username = form.username.data
+        password = form.password.data
 
         app.logger.debug(f"Attempting login for user: {username}")
 
@@ -266,7 +324,7 @@ def login():
             flash("⛔️ Invalid username or password")
             app.logger.debug("Login failed: Invalid username or password")
 
-    return render_template("login.html")
+    return render_template("login.html", form=form)
 
 
 @app.route("/verify-2fa-login", methods=["GET", "POST"])
@@ -279,8 +337,10 @@ def verify_2fa_login():
         flash("⛔️ User not found. Please login again.")
         return redirect(url_for("login"))
 
-    if request.method == "POST":
-        verification_code = request.form["verification_code"]
+    form = TwoFactorForm()
+
+    if form.validate_on_submit():
+        verification_code = form.verification_code.data
         totp = pyotp.TOTP(user.totp_secret)
         if totp.verify(verification_code):
             session["2fa_verified"] = True  # Set 2FA verification flag
@@ -288,7 +348,7 @@ def verify_2fa_login():
         else:
             flash("⛔️ Invalid 2FA code. Please try again.")
 
-    return render_template("verify_2fa_login.html")
+    return render_template("verify_2fa_login.html", form=form)
 
 
 @app.route("/inbox/<username>")
