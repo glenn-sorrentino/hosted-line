@@ -153,6 +153,14 @@ class SMTPSettingsForm(FlaskForm):
     smtp_password = PasswordField("SMTP Password", validators=[DataRequired()])
 
 
+class SMTPSettingsForm(FlaskForm):
+    email = StringField("Email", validators=[DataRequired(), Email()])
+    smtp_server = StringField("SMTP Server", validators=[DataRequired()])
+    smtp_port = IntegerField("SMTP Port", validators=[DataRequired()])
+    smtp_username = StringField("SMTP Username", validators=[DataRequired()])
+    smtp_password = PasswordField("SMTP Password", validators=[DataRequired()])
+
+
 class PGPKeyForm(FlaskForm):
     pgp_key = TextAreaField(
         "PGP Key", validators=[DataRequired(), Length(min=50)]
@@ -607,30 +615,25 @@ def is_valid_pgp_key(key):
         return False
 
 
-@app.route("/update_pgp_key", methods=["POST"])
+@app.route("/update_pgp_key", methods=["GET", "POST"])
 def update_pgp_key():
-    """
-    Route to update the user's PGP key.
-    """
     user_id = session.get("user_id")
     if not user_id:
         flash("⛔️ User not authenticated.")
         return redirect(url_for("login"))
 
     user = db.session.get(User, user_id)
-    if not user:
-        flash("⛔️ User not found.")
+    form = PGPKeyForm()
+    if form.validate_on_submit():
+        pgp_key = form.pgp_key.data
+        if is_valid_pgp_key(pgp_key):
+            user.pgp_key = pgp_key
+            db.session.commit()
+            flash("👍 PGP key updated successfully.")
+        else:
+            flash("⛔️ Invalid PGP key format or import failed.")
         return redirect(url_for("settings"))
-
-    pgp_key = request.form.get("pgp_key")
-    if pgp_key and is_valid_pgp_key(pgp_key):
-        user.pgp_key = pgp_key
-        db.session.commit()
-        flash("👍 PGP key updated successfully.")
-    else:
-        flash("⛔️ Invalid PGP key format or import failed.")
-
-    return redirect(url_for("settings"))
+    return render_template("settings.html", form=form)
 
 
 def encrypt_message(message, recipient_email):
@@ -660,7 +663,7 @@ def list_keys():
 list_keys()
 
 
-@app.route("/update_smtp_settings", methods=["POST"])
+@app.route("/update_smtp_settings", methods=["GET", "POST"])
 def update_smtp_settings():
     user_id = session.get("user_id")
     if not user_id:
@@ -671,32 +674,18 @@ def update_smtp_settings():
         flash("⛔️ User not found")
         return redirect(url_for("settings"))
 
-    # Updating SMTP settings from form data
-    user.email = request.form.get("email")
-    user.smtp_server = request.form.get("smtp_server")
-    user.smtp_port = request.form.get("smtp_port")
-    user.smtp_username = request.form.get("smtp_username")
-    user.smtp_password = request.form.get("smtp_password")
+    form = SMTPSettingsForm()
+    if form.validate_on_submit():
+        user.email = form.email.data
+        user.smtp_server = form.smtp_server.data
+        user.smtp_port = form.smtp_port.data
+        user.smtp_username = form.smtp_username.data
+        user.smtp_password = form.smtp_password.data
 
-    db.session.commit()
-    flash("👍 SMTP settings updated successfully")
-    return redirect(url_for("settings"))
-
-    msg.attach(MIMEText(body, "plain"))
-
-    try:
-        with smtplib.SMTP(user.smtp_server, user.smtp_port) as server:
-            server.starttls()
-            server.login(
-                user.smtp_username, user.smtp_password
-            )  # Use user's SMTP credentials
-            text = msg.as_string()
-            server.sendmail(user.email, recipient, text)
-        app.logger.info("Email sent successfully.")
-        return True
-    except Exception as e:
-        app.logger.error(f"Error sending email: {e}")
-        return False
+        db.session.commit()
+        flash("👍 SMTP settings updated successfully")
+        return redirect(url_for("settings"))
+    return render_template("settings.html", form=form)
 
 
 if __name__ == "__main__":
