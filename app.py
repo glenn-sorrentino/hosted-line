@@ -216,9 +216,9 @@ def register():
         # Hash the password and create the user
         password_hash = bcrypt.generate_password_hash(password).decode("utf-8")
         new_user = User(username=username, password_hash=password_hash)
-        db.session.add(new_user)
 
-        # Mark the invite code as used
+        # Add user and mark invite code as used
+        db.session.add(new_user)
         invite_code.used = True
         db.session.commit()
 
@@ -417,20 +417,72 @@ def settings():
     if user.totp_secret and not session.get("2fa_verified", False):
         return redirect(url_for("verify_2fa_login"))
 
-    # Create form instances
     change_password_form = ChangePasswordForm()
     change_username_form = ChangeUsernameForm()
     smtp_settings_form = SMTPSettingsForm()
     pgp_key_form = PGPKeyForm()
 
-    # Add more logic here if needed for form submissions
+    # Handle SMTP Settings Form Submission
+    if smtp_settings_form.validate_on_submit():
+        user.email = smtp_settings_form.email.data
+        user.smtp_server = smtp_settings_form.smtp_server.data
+        user.smtp_port = smtp_settings_form.smtp_port.data
+        user.smtp_username = smtp_settings_form.smtp_username.data
+        user.smtp_password = smtp_settings_form.smtp_password.data
+        db.session.commit()
+        flash("👍 SMTP settings updated successfully")
+        return redirect(url_for("settings"))
+
+    # Handle PGP Key Form Submission
+    if pgp_key_form.validate_on_submit():
+        user.pgp_key = pgp_key_form.pgp_key.data
+        db.session.commit()
+        flash("👍 PGP key updated successfully.")
+        return redirect(url_for("settings"))
+
+    # Handle Change Password Form Submission
+    if change_password_form.validate_on_submit():
+        if bcrypt.check_password_hash(
+            user.password_hash, change_password_form.old_password.data
+        ):
+            user.password_hash = bcrypt.generate_password_hash(
+                change_password_form.new_password.data
+            ).decode("utf-8")
+            db.session.commit()
+            flash("👍 Password changed successfully.")
+        else:
+            flash("⛔️ Incorrect old password.")
+        return redirect(url_for("settings"))
+
+    # Handle Change Username Form Submission
+    if change_username_form.validate_on_submit():
+        existing_user = User.query.filter_by(
+            username=change_username_form.new_username.data
+        ).first()
+        if existing_user:
+            flash("💔 This username is already taken.")
+        else:
+            user.username = change_username_form.new_username.data
+            db.session.commit()
+            session["username"] = user.username  # Update username in session
+            flash("👍 Username changed successfully.")
+        return redirect(url_for("settings"))
+
+    # Prepopulate the form fields
+    smtp_settings_form.email.data = user.email
+    smtp_settings_form.smtp_server.data = user.smtp_server
+    smtp_settings_form.smtp_port.data = user.smtp_port
+    smtp_settings_form.smtp_username.data = user.smtp_username
+    # Note: Password fields are typically not prepopulated for security reasons
+
+    pgp_key_form.pgp_key.data = user.pgp_key
 
     return render_template(
         "settings.html",
         user=user,
+        smtp_settings_form=smtp_settings_form,
         change_password_form=change_password_form,
         change_username_form=change_username_form,
-        smtp_settings_form=smtp_settings_form,
         pgp_key_form=pgp_key_form,
     )
 

@@ -58,19 +58,23 @@
             <button type="submit">Change Username</button>
         </form>
 
-        <!-- SMTP Settings Fields -->
+        <!-- SMTP Settings Section -->
         <h2>Email Delivery Settings</h2>
         <form method="POST" action="{{ url_for('update_smtp_settings') }}">
-            {{ smtp_settings_form.hidden_tag() }}
-            <label for="email">{{ smtp_settings_form.email.label }}</label>
-            {{ smtp_settings_form.email(id='email') }}
-            {% if smtp_settings_form.email.errors %}
-                {% for error in smtp_settings_form.email.errors %}
-                    <span style="color: red;">{{ error }}</span>
-                {% endfor %}
-            {% endif %}
-            
-            <!-- Repeat for other SMTP fields -->
+            {{ smtp_settings_form.email.label }}
+            {{ smtp_settings_form.email }}
+
+            {{ smtp_settings_form.smtp_server.label }}
+            {{ smtp_settings_form.smtp_server }}
+
+            {{ smtp_settings_form.smtp_port.label }}
+            {{ smtp_settings_form.smtp_port }}
+
+            {{ smtp_settings_form.smtp_username.label }}
+            {{ smtp_settings_form.smtp_username }}
+
+            {{ smtp_settings_form.smtp_password.label }}
+            {{ smtp_settings_form.smtp_password }}
 
             <button type="submit">Update Settings</button>
         </form>
