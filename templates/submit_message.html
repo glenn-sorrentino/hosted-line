@@ -5,12 +5,13 @@
     <h1 class="submit">Submit a message to {{ username }}</h1>
     {% if user.pgp_key %}
         <p>🔐 Your message will be encrypted and only readable by {{ username }}.</p>
-        {% else %}
-            <p>⚠️ Your message will NOT be encrypted. If this message is sensitive, ask {{ username }} to add a public PGP key.</p>
-        {% endif %}
+    {% else %}
+        <p>⚠️ Your message will NOT be encrypted. If this message is sensitive, ask {{ username }} to add a public PGP key.</p>
+    {% endif %}
     <form method="POST" action="/submit_message/{{ username }}">
+        {{ form.hidden_tag() }}
         <label for="content">Message</label>
-        <textarea id="content" name="content" required></textarea>
+        {{ form.content(size=32) }}
         <button type="submit">Send Message</button>
     </form>
 {% endblock %}

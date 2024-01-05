@@ -16,6 +16,9 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from werkzeug.security import generate_password_hash, check_password_hash
 import gnupg
+from flask_wtf import FlaskForm
+from wtforms import TextAreaField
+from wtforms.validators import DataRequired, Length
 
 # Load environment variables
 load_dotenv()
@@ -86,6 +89,12 @@ class InviteCode(db.Model):
 
     def __repr__(self):
         return "<InviteCode %r>" % self.code
+
+
+class MessageForm(FlaskForm):
+    content = TextAreaField(
+        "Message", validators=[DataRequired(), Length(max=2000)]
+    )  # Adjust max length as needed
 
 
 # Error Handler
@@ -377,28 +386,57 @@ def logout():
     return redirect(url_for("index"))
 
 
+def get_email_from_pgp_key(pgp_key):
+    try:
+        # Import the PGP key
+        imported_key = gpg.import_keys(pgp_key)
+
+        if imported_key.count > 0:
+            # Get the Key ID of the imported key
+            key_id = imported_key.results[0]["fingerprint"][-16:]
+
+            # List all keys to find the matching key
+            all_keys = gpg.list_keys()
+            for key in all_keys:
+                if key["keyid"] == key_id:
+                    # Extract email from the uid (user ID)
+                    uids = key["uids"][0]
+                    email_start = uids.find("<") + 1
+                    email_end = uids.find(">")
+                    if email_start > 0 and email_end > email_start:
+                        return uids[email_start:email_end]
+    except Exception as e:
+        app.logger.error(f"Error extracting email from PGP key: {e}")
+
+    return None
+
+
 @app.route("/submit_message/<username>", methods=["GET", "POST"])
 def submit_message(username):
-    # Fetch the user object based on the username
+    form = MessageForm()
     user = User.query.filter_by(username=username).first()
+
     if not user:
         flash("User not found")
-        return redirect(
-            url_for("index")
-        )  # Redirect to a suitable page if user not found
+        return redirect(url_for("index"))
 
-    if request.method == "POST":
-        content = request.form["content"]
+    if form.validate_on_submit():
+        content = form.content.data  # Sanitized input
         email_content = content  # Default to original content
         email_sent = False  # Flag to track email sending status
 
         if user.pgp_key:
-            encrypted_content = encrypt_message(content, "tips@scidsg.org")
-            if encrypted_content:
-                message = Message(content=encrypted_content, user_id=user.id)
-                email_content = encrypted_content  # Use encrypted content for email
+            pgp_email = get_email_from_pgp_key(user.pgp_key)
+            if pgp_email:
+                encrypted_content = encrypt_message(content, pgp_email)
+                if encrypted_content:
+                    message = Message(content=encrypted_content, user_id=user.id)
+                    email_content = encrypted_content  # Use encrypted content for email
+                else:
+                    flash("⛔️ Failed to encrypt message with PGP key.")
+                    return redirect(url_for("submit_message", username=username))
             else:
-                flash("⛔️ Failed to encrypt message with PGP key.")
+                flash("⛔️ Unable to extract email from PGP key.")
                 return redirect(url_for("submit_message", username=username))
         else:
             message = Message(content=content, user_id=user.id)
@@ -406,7 +444,6 @@ def submit_message(username):
         db.session.add(message)
         db.session.commit()
 
-        # Checking if SMTP settings are configured
         if (
             user.email
             and user.smtp_server
@@ -416,7 +453,6 @@ def submit_message(username):
         ):
             email_sent = send_email(user.email, "New Message", email_content, user)
 
-        # Custom flash message for both scenarios
         if email_sent:
             flash("📥 Message submitted and emailed")
         else:
@@ -424,8 +460,9 @@ def submit_message(username):
 
         return redirect(url_for("submit_message", username=username))
 
-    # Include the user variable when rendering the template
-    return render_template("submit_message.html", username=username, user=user)
+    return render_template(
+        "submit_message.html", form=form, username=username, user=user
+    )
 
 
 def send_email(recipient, subject, body, user):
@@ -494,17 +531,11 @@ def update_pgp_key():
     return redirect(url_for("settings"))
 
 
-def encrypt_message(message, recipient):
-    # Get the absolute path to the .gnupg directory
-    gpg_home = os.path.expanduser("~/.gnupg")
-
-    # Initialize GPG with the absolute path and custom options
+def encrypt_message(message, recipient_email):
     gpg = gnupg.GPG(gnupghome=gpg_home, options=["--trust-model", "always"])
+    app.logger.info(f"Encrypting message for recipient: {recipient_email}")
 
-    app.logger.info(f"Encrypting message for recipient: {recipient}")
-
-    # Perform encryption
-    encrypted_data = gpg.encrypt(message, recipients=recipient, always_trust=True)
+    encrypted_data = gpg.encrypt(message, recipients=recipient_email, always_trust=True)
 
     if not encrypted_data.ok:
         app.logger.error(f"Encryption failed: {encrypted_data.status}")

@@ -211,7 +211,7 @@ python3 -m venv venv
 source venv/bin/activate
 
 # Install Flask, Gunicorn, and other Python libraries
-pip install Flask pymysql python-dotenv gunicorn Flask-SQLAlchemy Flask-Bcrypt pyotp qrcode python-gnupg
+pip install Flask pymysql python-dotenv gunicorn Flask-SQLAlchemy Flask-Bcrypt pyotp qrcode python-gnupg Flask-WTF
 
 SECRET_KEY=$(python3 -c 'import os; print(os.urandom(64).hex())')
 
