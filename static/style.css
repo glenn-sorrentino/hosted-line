@@ -21,7 +21,7 @@ body {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
-	padding: 7rem 1rem 1rem 1rem;
+	padding: 5.25rem 1rem 1rem 1rem;
 	position: relative;
 	margin: 0;
 	font-family: 'Atkinson Hyperlegible', sans-serif;
@@ -126,7 +126,7 @@ header {
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
-	padding: .5rem 1.25rem;
+	padding: .75rem 1.25rem;
 	box-sizing: border-box;
 	border-radius: .25rem;
 }
@@ -144,6 +144,8 @@ header nav {
 header nav ul {
 	display: flex;
 	gap: 1.5rem;
+	margin: 0;
+	padding: 0;
 }
 
 header nav li {
@@ -252,6 +254,8 @@ header .btn {
 	margin-left: 1rem;
 	min-width: initial;
 	min-height: initial;
+	margin-top: 0;
+	margin-bottom: 0;
 }
 
 .formBody input[type="submit"],
