@@ -105,7 +105,10 @@ class User(db.Model):
 
     @totp_secret.setter
     def totp_secret(self, value):
-        self._totp_secret = encrypt_field(value)
+        if value is None:
+            self._totp_secret = None
+        else:
+            self._totp_secret = encrypt_field(value)
 
     @property
     def email(self):
@@ -433,10 +436,12 @@ def login():
         if user and bcrypt.check_password_hash(user.password_hash, password):
             session["user_id"] = user.id
             session["username"] = user.username
+            session["2fa_verified"] = False  # Set 2FA verification flag to False
 
             if user.totp_secret:
                 return redirect(url_for("verify_2fa_login"))
             else:
+                session["2fa_verified"] = True  # Direct login if 2FA not enabled
                 return redirect(url_for("inbox", username=username))
         else:
             flash("Invalid username or password")
@@ -470,39 +475,47 @@ def verify_2fa_login():
 
 @app.route("/inbox/<username>")
 def inbox(username):
-    app.logger.debug(
-        f"Session Username: {session.get('username')}, URL Username: {username}"
-    )
-
-    # Redirect to login if not logged in or if session username doesn't match URL username
-    if "user_id" not in session or session.get("username") != username:
-        app.logger.debug("Unauthorized access attempt to inbox.")
+    # Redirect to login if not logged in
+    if "user_id" not in session:
+        flash("Please log in to access your inbox.")
         return redirect(url_for("login"))
 
-    user = User.query.filter_by(username=username).first()
+    user = User.query.get(session["user_id"])
     if not user:
-        app.logger.debug("No user found with this username")
-        flash("User not found.")
+        flash("User not found. Please log in again.")
+        session.pop("user_id", None)
         return redirect(url_for("login"))
 
+    # Check if the session username matches the requested inbox
+    if session.get("username") != username:
+        flash("Unauthorized access.")
+        return redirect(url_for("login"))
+
+    # Check if 2FA is verified for users with 2FA enabled
+    if user.totp_secret and not session.get("2fa_verified", False):
+        return redirect(url_for("verify_2fa_login"))
+
+    # Fetch messages for the user
     messages = Message.query.filter_by(user_id=user.id).all()
     return render_template("inbox.html", messages=messages, user=user)
 
 
 @app.route("/settings", methods=["GET", "POST"])
 def settings():
-    user_id = session.get("user_id")
-    if not user_id:
+    # Redirect to login if not logged in
+    if "user_id" not in session:
         return redirect(url_for("login"))
 
-    user = User.query.get(user_id)
+    user = User.query.get(session["user_id"])
     if not user:
         flash("⛔️ User not found.")
         return redirect(url_for("login"))
 
+    # Check if 2FA is verified for users with 2FA enabled
     if user.totp_secret and not session.get("2fa_verified", False):
         return redirect(url_for("verify_2fa_login"))
 
+    # Forms for various settings
     change_password_form = ChangePasswordForm()
     change_username_form = ChangeUsernameForm()
     smtp_settings_form = SMTPSettingsForm()
@@ -556,14 +569,21 @@ def settings():
             flash("👍 Username changed successfully.")
         return redirect(url_for("settings"))
 
-    # Prepopulate the form fields
+    # Prepopulate SMTP settings form fields and others
     smtp_settings_form.email.data = user.email
     smtp_settings_form.smtp_server.data = user.smtp_server
     smtp_settings_form.smtp_port.data = user.smtp_port
     smtp_settings_form.smtp_username.data = user.smtp_username
-    # Note: Password fields are typically not prepopulated for security reasons
-
     pgp_key_form.pgp_key.data = user.pgp_key
+
+    return render_template(
+        "settings.html",
+        user=user,
+        smtp_settings_form=smtp_settings_form,
+        change_password_form=change_password_form,
+        change_username_form=change_username_form,
+        pgp_key_form=pgp_key_form,
+    )
 
     return render_template(
         "settings.html",
