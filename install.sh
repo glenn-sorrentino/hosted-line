@@ -217,8 +217,8 @@ SECRET_KEY=$(python3 -c 'import os; print(os.urandom(64).hex())')
 ENCRYPTION_KEY=$(python3 -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')
 
 # Store in .env file
-echo "ENCRYPTION_KEY=$ENCRYPTION_KEY" > .env   # Overwrite/create file for the first variable
-echo "DB_NAME=$DB_NAME" >> .env               # Append remaining variables
+echo "ENCRYPTION_KEY=$ENCRYPTION_KEY" > .env
+echo "DB_NAME=$DB_NAME" >> .env  
 echo "DB_USER=$DB_USER" >> .env
 echo "DB_PASS=$DB_PASS" >> .env
 echo "SECRET_KEY=$SECRET_KEY" >> .env
@@ -341,7 +341,7 @@ echo "✅ UFW configuration complete."
 
 
 # Update Tor permissions
-sudo chown debian-tor:www-data /var/www/html/ourdemo.app/hushline-hosted.sock
+sudo chown debian-tor:www-data /var/www/html/$DOMAIN/hushline-hosted.sock
 service tor restart
 
 # Generate Codes
