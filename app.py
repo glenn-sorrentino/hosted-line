@@ -42,6 +42,8 @@ def encrypt_field(data):
 
 
 def decrypt_field(data):
+    if data is None:
+        return None
     return fernet.decrypt(data.encode()).decode()
 
 
@@ -79,7 +81,7 @@ app.logger.setLevel(logging.DEBUG)
 # Database Models
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    _username = db.Column("username", db.String(255), unique=True, nullable=False)
+    username = db.Column(db.String(80), unique=True, nullable=False)
     _password_hash = db.Column("password_hash", db.String(255))
     _totp_secret = db.Column("totp_secret", db.String(100))
     _email = db.Column("email", db.String(255))
@@ -88,14 +90,6 @@ class User(db.Model):
     _smtp_username = db.Column("smtp_username", db.String(255))
     _smtp_password = db.Column("smtp_password", db.String(255))
     _pgp_key = db.Column("pgp_key", db.Text)
-
-    @property
-    def username(self):
-        return decrypt_field(self._username)
-
-    @username.setter
-    def username(self, value):
-        self._username = encrypt_field(value)
 
     @property
     def password_hash(self):
@@ -442,22 +436,12 @@ def login():
         username = form.username.data
         password = form.password.data
 
-        app.logger.debug(f"Attempting login for user: {username}")
-
         user = User.query.filter_by(username=username).first()
 
-        # Check password and if 2FA is enabled
         if user and bcrypt.check_password_hash(user.password_hash, password):
-            session["user_id"] = user.id
-            session["username"] = user.username
-
-            if user.totp_secret:
-                return redirect(url_for("verify_2fa_login"))
-            else:
-                return redirect(url_for("inbox", username=username))
+            # User authentication logic
         else:
-            flash("⛔️ Invalid username or password")
-            app.logger.debug("Login failed: Invalid username or password")
+            flash("Invalid username or password")
 
     return render_template("login.html", form=form)
 
