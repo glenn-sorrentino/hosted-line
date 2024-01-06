@@ -21,6 +21,15 @@ from wtforms import TextAreaField, StringField, PasswordField, IntegerField
 from wtforms.validators import DataRequired, Length, Email
 from cryptography.fernet import Fernet
 
+# Load environment variables
+load_dotenv()
+
+# Retrieve database credentials and secret key from environment
+db_user = os.getenv("DB_USER")
+db_pass = os.getenv("DB_PASS")
+db_name = os.getenv("DB_NAME")
+secret_key = os.getenv("SECRET_KEY")
+
 # Load encryption key
 encryption_key = os.getenv("ENCRYPTION_KEY")
 fernet = Fernet(encryption_key)
@@ -33,15 +42,6 @@ def encrypt_field(data):
 def decrypt_field(data):
     return fernet.decrypt(data.encode()).decode()
 
-
-# Load environment variables
-load_dotenv()
-
-# Retrieve database credentials and secret key from environment
-db_user = os.getenv("DB_USER")
-db_pass = os.getenv("DB_PASS")
-db_name = os.getenv("DB_NAME")
-secret_key = os.getenv("SECRET_KEY")
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = secret_key
