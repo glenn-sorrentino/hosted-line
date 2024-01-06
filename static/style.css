@@ -106,10 +106,13 @@ p.instr {
         top: 1rem;
         opacity: 1;
     }
-    100% {
-        top: 0;
+    99% {
+    	top: 0;
         opacity: 0;
-        display: none;
+    }
+    100% {
+		opacity: 0;
+        z-index: -999;
     }
 
 }
