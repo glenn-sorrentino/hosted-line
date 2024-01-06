@@ -61,6 +61,8 @@
         <!-- SMTP Settings Section -->
         <h2>Email Delivery Settings</h2>
         <form method="POST" action="{{ url_for('update_smtp_settings') }}">
+            {{ smtp_settings_form.hidden_tag() }}
+            
             {{ smtp_settings_form.email.label }}
             {{ smtp_settings_form.email }}
 

@@ -726,18 +726,42 @@ def update_smtp_settings():
         flash("⛔️ User not found")
         return redirect(url_for("settings"))
 
-    form = SMTPSettingsForm()
-    if form.validate_on_submit():
-        user.email = form.email.data
-        user.smtp_server = form.smtp_server.data
-        user.smtp_port = form.smtp_port.data
-        user.smtp_username = form.smtp_username.data
-        user.smtp_password = form.smtp_password.data
+    # Initialize forms
+    change_password_form = ChangePasswordForm()
+    change_username_form = ChangeUsernameForm()
+    smtp_settings_form = SMTPSettingsForm()
+    pgp_key_form = PGPKeyForm()
+
+    # Handling SMTP settings form submission
+    if smtp_settings_form.validate_on_submit():
+        # Updating SMTP settings from form data
+        user.email = smtp_settings_form.email.data
+        user.smtp_server = smtp_settings_form.smtp_server.data
+        user.smtp_port = smtp_settings_form.smtp_port.data
+        user.smtp_username = smtp_settings_form.smtp_username.data
+        user.smtp_password = smtp_settings_form.smtp_password.data
 
         db.session.commit()
         flash("👍 SMTP settings updated successfully")
         return redirect(url_for("settings"))
-    return render_template("settings.html", form=form)
+
+    # Prepopulate SMTP settings form fields
+    smtp_settings_form.email.data = user.email
+    smtp_settings_form.smtp_server.data = user.smtp_server
+    smtp_settings_form.smtp_port.data = user.smtp_port
+    smtp_settings_form.smtp_username.data = user.smtp_username
+    # Note: Password fields are typically not prepopulated for security reasons
+
+    pgp_key_form.pgp_key.data = user.pgp_key
+
+    return render_template(
+        "settings.html",
+        user=user,
+        smtp_settings_form=smtp_settings_form,
+        change_password_form=change_password_form,
+        change_username_form=change_username_form,
+        pgp_key_form=pgp_key_form,
+    )
 
 
 if __name__ == "__main__":
