@@ -83,7 +83,7 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     _password_hash = db.Column("password_hash", db.String(255))
-    _totp_secret = db.Column("totp_secret", db.String(100))
+    _totp_secret = db.Column("totp_secret", db.String(255))
     _email = db.Column("email", db.String(255))
     _smtp_server = db.Column("smtp_server", db.String(255))
     smtp_port = db.Column("smtp_port", db.Integer)
