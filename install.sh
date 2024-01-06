@@ -50,7 +50,7 @@ echo "Domain: $DOMAIN"
 sudo tee /etc/tor/torrc << EOL
 RunAsDaemon 1
 HiddenServiceDir /var/lib/tor/$DOMAIN/
-HiddenServicePort 80 127.0.0.1:5000
+HiddenServicePort 80 unix:/var/www/html/$DOMAIN/hushline-hosted.sock
 EOL
 
 # Restart Tor service
@@ -189,8 +189,8 @@ SERVER_IP=$(curl -s ifconfig.me)
 WIDTH=$(tput cols)
 whiptail --msgbox --title "Instructions" "\nPlease ensure that your DNS records are correctly set up before proceeding:\n\nAdd an A record with the name: @ and content: $SERVER_IP\n* Add a CNAME record with the name $SAUTEED_ONION_ADDRESS.$DOMAIN and content: $DOMAIN\n* Add a CAA record with the name: @ and content: 0 issue \"letsencrypt.org\"\n" 14 $WIDTH
 # Request the certificates
-echo "⏲️  Waiting 1 minute for DNS to update..."
-sleep 60
+echo "⏲️  Waiting 2 minutes for DNS to update..."
+sleep 120
 certbot --nginx -d $DOMAIN,$SAUTEED_ONION_ADDRESS.$DOMAIN --agree-tos --non-interactive --no-eff-email --email ${EMAIL}
 
 echo "Configuring automatic renewing certificates..."
@@ -202,6 +202,7 @@ echo "✅ Automatic HTTPS certificates configured."
 ####################################
 
 cd $DOMAIN
+git switch sanitize
 
 mkdir -p ~/.gnupg
 chmod 700 ~/.gnupg
@@ -211,7 +212,7 @@ python3 -m venv venv
 source venv/bin/activate
 
 # Install Flask, Gunicorn, and other Python libraries
-pip install Flask pymysql python-dotenv gunicorn Flask-SQLAlchemy Flask-Bcrypt pyotp qrcode python-gnupg Flask-WTF
+pip install Flask pymysql python-dotenv gunicorn Flask-SQLAlchemy Flask-Bcrypt pyotp qrcode python-gnupg Flask-WTF email_validator
 
 SECRET_KEY=$(python3 -c 'import os; print(os.urandom(64).hex())')
 
@@ -336,6 +337,10 @@ ufw limit ssh/tcp
 echo "y" | ufw enable
 
 echo "✅ UFW configuration complete."
+
+# Update Tor permissions
+sudo chown debian-tor:www-data /var/www/html/ourdemo.app/hushline-hosted.sock
+service tor restart
 
 echo "
 ✅ Hush Line installation complete! Access your site at these addresses:
