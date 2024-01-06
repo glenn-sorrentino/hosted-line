@@ -211,11 +211,13 @@ python3 -m venv venv
 source venv/bin/activate
 
 # Install Flask, Gunicorn, and other Python libraries
-pip install Flask pymysql python-dotenv gunicorn Flask-SQLAlchemy Flask-Bcrypt pyotp qrcode python-gnupg Flask-WTF
+pip install Flask pymysql python-dotenv gunicorn Flask-SQLAlchemy Flask-Bcrypt pyotp qrcode python-gnupg Flask-WTF cryptography
 
 SECRET_KEY=$(python3 -c 'import os; print(os.urandom(64).hex())')
+ENCRYPTION_KEY=$(python3 -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')
 
-# Create .env file for Flask app
+# Store in .env file
+echo "ENCRYPTION_KEY=$ENCRYPTION_KEY" >> .env
 echo "DB_NAME=$DB_NAME" > .env
 echo "DB_USER=$DB_USER" >> .env
 echo "DB_PASS=$DB_PASS" >> .env

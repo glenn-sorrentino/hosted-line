@@ -19,6 +19,20 @@ import gnupg
 from flask_wtf import FlaskForm
 from wtforms import TextAreaField
 from wtforms.validators import DataRequired, Length
+from cryptography.fernet import Fernet
+
+# Load encryption key
+encryption_key = os.getenv("ENCRYPTION_KEY")
+fernet = Fernet(encryption_key)
+
+
+def encrypt_field(data):
+    return fernet.encrypt(data.encode()).decode()
+
+
+def decrypt_field(data):
+    return fernet.decrypt(data.encode()).decode()
+
 
 # Load environment variables
 load_dotenv()
@@ -63,22 +77,106 @@ app.logger.setLevel(logging.DEBUG)
 # Database Models
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False)
-    password_hash = db.Column(db.String(255))
-    totp_secret = db.Column(db.String(100))
-    email = db.Column(db.String(255))
-    smtp_server = db.Column(db.String(255))
-    smtp_port = db.Column(db.Integer)
-    smtp_username = db.Column(db.String(255))
-    smtp_password = db.Column(db.String(255))
-    pgp_key = db.Column(db.Text)
+    _username = db.Column("username", db.String(80), unique=True, nullable=False)
+    _password_hash = db.Column("password_hash", db.String(255))
+    _totp_secret = db.Column("totp_secret", db.String(100))
+    _email = db.Column("email", db.String(255))
+    _smtp_server = db.Column("smtp_server", db.String(255))
+    _smtp_port = db.Column("smtp_port", db.Integer)
+    _smtp_username = db.Column("smtp_username", db.String(255))
+    _smtp_password = db.Column("smtp_password", db.String(255))
+    _pgp_key = db.Column("pgp_key", db.Text)
+
+    @property
+    def username(self):
+        return decrypt_field(self._username)
+
+    @username.setter
+    def username(self, value):
+        self._username = encrypt_field(value)
+
+    @property
+    def password_hash(self):
+        return decrypt_field(self._password_hash)
+
+    @password_hash.setter
+    def password_hash(self, value):
+        self._password_hash = encrypt_field(value)
+
+    @property
+    def totp_secret(self):
+        return decrypt_field(self._totp_secret)
+
+    @totp_secret.setter
+    def totp_secret(self, value):
+        self._totp_secret = encrypt_field(value)
+
+    @property
+    def email(self):
+        return decrypt_field(self._email)
+
+    @email.setter
+    def email(self, value):
+        self._email = encrypt_field(value)
+
+    @property
+    def smtp_server(self):
+        return decrypt_field(self._smtp_server)
+
+    @smtp_server.setter
+    def smtp_server(self, value):
+        self._smtp_server = encrypt_field(value)
+
+    @property
+    def smtp_port(self):
+        return int(decrypt_field(self._smtp_port))
+
+    @smtp_port.setter
+    def smtp_port(self, value):
+        self._smtp_port = encrypt_field(str(value))
+
+    @property
+    def smtp_username(self):
+        return decrypt_field(self._smtp_username)
+
+    @smtp_username.setter
+    def smtp_username(self, value):
+        self._smtp_username = encrypt_field(value)
+
+    @property
+    def smtp_password(self):
+        return decrypt_field(self._smtp_password)
+
+    @smtp_password.setter
+    def smtp_password(self, value):
+        self._smtp_password = encrypt_field(value)
+
+    @property
+    def pgp_key(self):
+        return decrypt_field(self._pgp_key)
+
+    @pgp_key.setter
+    def pgp_key(self, value):
+        self._pgp_key = encrypt_field(value)
 
 
 class Message(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    content = db.Column(db.Text, nullable=False)
+    _content = db.Column(
+        "content", db.Text, nullable=False
+    )  # Encrypted content stored here
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     user = db.relationship("User", backref=db.backref("messages", lazy=True))
+
+    @property
+    def content(self):
+        """Decrypt and return the message content."""
+        return decrypt_field(self._content)
+
+    @content.setter
+    def content(self, value):
+        """Encrypt and store the message content."""
+        self._content = encrypt_field(value)
 
 
 class InviteCode(db.Model):
