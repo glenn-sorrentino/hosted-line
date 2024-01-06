@@ -202,7 +202,6 @@ echo "✅ Automatic HTTPS certificates configured."
 ####################################
 
 cd $DOMAIN
-git switch sanitize
 
 mkdir -p ~/.gnupg
 chmod 700 ~/.gnupg
@@ -341,6 +340,10 @@ echo "✅ UFW configuration complete."
 # Update Tor permissions
 sudo chown debian-tor:www-data /var/www/html/ourdemo.app/hushline-hosted.sock
 service tor restart
+
+# Generate Codes
+chmod +x generate_codes.sh
+./generate_codes.sh
 
 echo "
 ✅ Hush Line installation complete! Access your site at these addresses:
