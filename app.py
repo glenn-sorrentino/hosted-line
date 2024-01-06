@@ -79,7 +79,7 @@ app.logger.setLevel(logging.DEBUG)
 # Database Models
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    _username = db.Column("username", db.String(80), unique=True, nullable=False)
+    _username = db.Column("username", db.String(255), unique=True, nullable=False)
     _password_hash = db.Column("password_hash", db.String(255))
     _totp_secret = db.Column("totp_secret", db.String(100))
     _email = db.Column("email", db.String(255))
