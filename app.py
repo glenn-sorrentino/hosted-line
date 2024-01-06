@@ -517,7 +517,7 @@ def change_password():
     else:
         flash("⛔️ Incorrect old password.")
 
-    return redirect(url_for("settings"))
+    return redirect(url_for("logout"))
 
 
 @app.route("/change-username", methods=["POST"])
