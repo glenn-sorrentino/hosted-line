@@ -86,7 +86,7 @@ class User(db.Model):
     _totp_secret = db.Column("totp_secret", db.String(100))
     _email = db.Column("email", db.String(255))
     _smtp_server = db.Column("smtp_server", db.String(255))
-    _smtp_port = db.Column("smtp_port", db.Integer)
+    smtp_port = db.Column("smtp_port", db.Integer)
     _smtp_username = db.Column("smtp_username", db.String(255))
     _smtp_password = db.Column("smtp_password", db.String(255))
     _pgp_key = db.Column("pgp_key", db.Text)
@@ -122,14 +122,6 @@ class User(db.Model):
     @smtp_server.setter
     def smtp_server(self, value):
         self._smtp_server = encrypt_field(value)
-
-    @property
-    def smtp_port(self):
-        return int(decrypt_field(self._smtp_port))
-
-    @smtp_port.setter
-    def smtp_port(self, value):
-        self._smtp_port = encrypt_field(str(value))
 
     @property
     def smtp_username(self):
@@ -503,7 +495,11 @@ def settings():
     if not user_id:
         return redirect(url_for("login"))
 
-    user = db.session.get(User, user_id)
+    user = User.query.get(user_id)
+    if not user:
+        flash("⛔️ User not found.")
+        return redirect(url_for("login"))
+
     if user.totp_secret and not session.get("2fa_verified", False):
         return redirect(url_for("verify_2fa_login"))
 
@@ -516,11 +512,13 @@ def settings():
     if smtp_settings_form.validate_on_submit():
         user.email = smtp_settings_form.email.data
         user.smtp_server = smtp_settings_form.smtp_server.data
-        user.smtp_port = smtp_settings_form.smtp_port.data
+        user.smtp_port = (
+            smtp_settings_form.smtp_port.data
+        )  # Directly assign the integer value
         user.smtp_username = smtp_settings_form.smtp_username.data
         user.smtp_password = smtp_settings_form.smtp_password.data
         db.session.commit()
-        flash("👍 SMTP settings updated successfully")
+        flash("👍 SMTP settings updated successfully.")
         return redirect(url_for("settings"))
 
     # Handle PGP Key Form Submission
