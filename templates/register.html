@@ -1,20 +1,30 @@
 {% extends "base.html" %}
-{% block title %}Settings{% endblock %}
+{% block title %}Register{% endblock %}
 
 {% block content %}
     <h1>Register</h1>
     <form method="POST" action="/register">
+        {{ form.hidden_tag() }}
         <div>
-            <label for="username">Username</label>
-            <input type="text" id="username" name="username" required>
+            {{ form.username.label(for="username") }}
+            {{ form.username(id="username") }}
+            {% if form.username.errors %}
+                <div class="error">{{ form.username.errors[0] }}</div>
+            {% endif %}
         </div>
         <div>
-            <label for="password">Password</label>
-            <input type="password" id="password" name="password" required>
+            {{ form.password.label(for="password") }}
+            {{ form.password(id="password") }}
+            {% if form.password.errors %}
+                <div class="error">{{ form.password.errors[0] }}</div>
+            {% endif %}
         </div>
         <div>
-            <label for="invite_code">Invite Code</label>
-            <input type="text" id="invite_code" name="invite_code" required>
+            {{ form.invite_code.label(for="invite_code") }}
+            {{ form.invite_code(id="invite_code") }}
+            {% if form.invite_code.errors %}
+                <div class="error">{{ form.invite_code.errors[0] }}</div>
+            {% endif %}
         </div>
         <button type="submit">Register</button>
     </form>

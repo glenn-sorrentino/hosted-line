@@ -4,13 +4,14 @@
 {% block content %}
     <h1>Login</h1>
     <form method="POST" action="/login">
+        {{ form.hidden_tag() }}
         <div>
-            <label for="username">Username</label>
-            <input type="text" id="username" name="username" required>
+            {{ form.username.label(for="username") }}
+            {{ form.username(id="username", required=True) }}
         </div>
         <div>
-            <label for="password">Password</label>
-            <input type="password" id="password" name="password" required>
+            {{ form.password.label(for="password") }}
+            {{ form.password(id="password", required=True) }}
         </div>
         <button type="submit">Login</button>
     </form>

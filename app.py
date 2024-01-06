@@ -32,6 +32,8 @@ secret_key = os.getenv("SECRET_KEY")
 
 # Load encryption key
 encryption_key = os.getenv("ENCRYPTION_KEY")
+if encryption_key is None:
+    raise ValueError("Encryption key not found. Please check your .env file.")
 fernet = Fernet(encryption_key)
 
 

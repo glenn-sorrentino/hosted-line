@@ -9,7 +9,13 @@
     <p><span class="bold">Text Code:</span> <span class="mono">{{ text_code }}</span></p>
 
     <form method="POST" action="{{ url_for('enable_2fa') }}">
-        <input type="text" name="verification_code" placeholder="Enter 2FA code" required>
+        {{ form.hidden_tag() }}
+        {{ form.verification_code.label }} {{ form.verification_code(size=6) }}
+        {% if form.verification_code.errors %}
+            {% for error in form.verification_code.errors %}
+                <span style="color: red;">{{ error }}</span>
+            {% endfor %}
+        {% endif %}
         <button type="submit">Verify and Enable</button>
     </form>
 {% endblock %}
