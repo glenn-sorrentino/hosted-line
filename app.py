@@ -19,6 +19,7 @@ import gnupg
 from flask_wtf import FlaskForm
 from wtforms import TextAreaField, StringField, PasswordField, IntegerField
 from wtforms.validators import DataRequired, Length, Email
+from cryptography.fernet import Fernet
 
 # Load environment variables
 load_dotenv()
@@ -28,6 +29,23 @@ db_user = os.getenv("DB_USER")
 db_pass = os.getenv("DB_PASS")
 db_name = os.getenv("DB_NAME")
 secret_key = os.getenv("SECRET_KEY")
+
+# Load encryption key
+encryption_key = os.getenv("ENCRYPTION_KEY")
+if encryption_key is None:
+    raise ValueError("Encryption key not found. Please check your .env file.")
+fernet = Fernet(encryption_key)
+
+
+def encrypt_field(data):
+    return fernet.encrypt(data.encode()).decode()
+
+
+def decrypt_field(data):
+    if data is None:
+        return None
+    return fernet.decrypt(data.encode()).decode()
+
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = secret_key
@@ -64,21 +82,92 @@ app.logger.setLevel(logging.DEBUG)
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
-    password_hash = db.Column(db.String(255))
-    totp_secret = db.Column(db.String(100))
-    email = db.Column(db.String(255))
-    smtp_server = db.Column(db.String(255))
-    smtp_port = db.Column(db.Integer)
-    smtp_username = db.Column(db.String(255))
-    smtp_password = db.Column(db.String(255))
-    pgp_key = db.Column(db.Text)
+    _password_hash = db.Column("password_hash", db.String(255))
+    _totp_secret = db.Column("totp_secret", db.String(255))
+    _email = db.Column("email", db.String(255))
+    _smtp_server = db.Column("smtp_server", db.String(255))
+    smtp_port = db.Column("smtp_port", db.Integer)
+    _smtp_username = db.Column("smtp_username", db.String(255))
+    _smtp_password = db.Column("smtp_password", db.String(255))
+    _pgp_key = db.Column("pgp_key", db.Text)
+
+    @property
+    def password_hash(self):
+        return decrypt_field(self._password_hash)
+
+    @password_hash.setter
+    def password_hash(self, value):
+        self._password_hash = encrypt_field(value)
+
+    @property
+    def totp_secret(self):
+        return decrypt_field(self._totp_secret)
+
+    @totp_secret.setter
+    def totp_secret(self, value):
+        if value is None:
+            self._totp_secret = None
+        else:
+            self._totp_secret = encrypt_field(value)
+
+    @property
+    def email(self):
+        return decrypt_field(self._email)
+
+    @email.setter
+    def email(self, value):
+        self._email = encrypt_field(value)
+
+    @property
+    def smtp_server(self):
+        return decrypt_field(self._smtp_server)
+
+    @smtp_server.setter
+    def smtp_server(self, value):
+        self._smtp_server = encrypt_field(value)
+
+    @property
+    def smtp_username(self):
+        return decrypt_field(self._smtp_username)
+
+    @smtp_username.setter
+    def smtp_username(self, value):
+        self._smtp_username = encrypt_field(value)
+
+    @property
+    def smtp_password(self):
+        return decrypt_field(self._smtp_password)
+
+    @smtp_password.setter
+    def smtp_password(self, value):
+        self._smtp_password = encrypt_field(value)
+
+    @property
+    def pgp_key(self):
+        return decrypt_field(self._pgp_key)
+
+    @pgp_key.setter
+    def pgp_key(self, value):
+        self._pgp_key = encrypt_field(value)
 
 
 class Message(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    content = db.Column(db.Text, nullable=False)
+    _content = db.Column(
+        "content", db.Text, nullable=False
+    )  # Encrypted content stored here
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     user = db.relationship("User", backref=db.backref("messages", lazy=True))
+
+    @property
+    def content(self):
+        """Decrypt and return the message content."""
+        return decrypt_field(self._content)
+
+    @content.setter
+    def content(self, value):
+        """Encrypt and store the message content."""
+        self._content = encrypt_field(value)
 
 
 class InviteCode(db.Model):
@@ -342,22 +431,20 @@ def login():
         username = form.username.data
         password = form.password.data
 
-        app.logger.debug(f"Attempting login for user: {username}")
-
         user = User.query.filter_by(username=username).first()
 
-        # Check password and if 2FA is enabled
         if user and bcrypt.check_password_hash(user.password_hash, password):
             session["user_id"] = user.id
             session["username"] = user.username
+            session["2fa_verified"] = False  # Set 2FA verification flag to False
 
             if user.totp_secret:
                 return redirect(url_for("verify_2fa_login"))
             else:
+                session["2fa_verified"] = True  # Direct login if 2FA not enabled
                 return redirect(url_for("inbox", username=username))
         else:
-            flash("⛔️ Invalid username or password")
-            app.logger.debug("Login failed: Invalid username or password")
+            flash("Invalid username or password")
 
     return render_template("login.html", form=form)
 
@@ -388,35 +475,47 @@ def verify_2fa_login():
 
 @app.route("/inbox/<username>")
 def inbox(username):
-    app.logger.debug(
-        f"Session Username: {session.get('username')}, URL Username: {username}"
-    )
-
-    # Redirect to login if not logged in or if session username doesn't match URL username
-    if "user_id" not in session or session.get("username") != username:
-        app.logger.debug("Unauthorized access attempt to inbox.")
+    # Redirect to login if not logged in
+    if "user_id" not in session:
+        flash("Please log in to access your inbox.")
         return redirect(url_for("login"))
 
-    user = User.query.filter_by(username=username).first()
+    user = User.query.get(session["user_id"])
     if not user:
-        app.logger.debug("No user found with this username")
-        flash("User not found.")
+        flash("User not found. Please log in again.")
+        session.pop("user_id", None)
         return redirect(url_for("login"))
 
+    # Check if the session username matches the requested inbox
+    if session.get("username") != username:
+        flash("Unauthorized access.")
+        return redirect(url_for("login"))
+
+    # Check if 2FA is verified for users with 2FA enabled
+    if user.totp_secret and not session.get("2fa_verified", False):
+        return redirect(url_for("verify_2fa_login"))
+
+    # Fetch messages for the user
     messages = Message.query.filter_by(user_id=user.id).all()
     return render_template("inbox.html", messages=messages, user=user)
 
 
 @app.route("/settings", methods=["GET", "POST"])
 def settings():
-    user_id = session.get("user_id")
-    if not user_id:
+    # Redirect to login if not logged in
+    if "user_id" not in session:
         return redirect(url_for("login"))
 
-    user = db.session.get(User, user_id)
+    user = User.query.get(session["user_id"])
+    if not user:
+        flash("⛔️ User not found.")
+        return redirect(url_for("login"))
+
+    # Check if 2FA is verified for users with 2FA enabled
     if user.totp_secret and not session.get("2fa_verified", False):
         return redirect(url_for("verify_2fa_login"))
 
+    # Forms for various settings
     change_password_form = ChangePasswordForm()
     change_username_form = ChangeUsernameForm()
     smtp_settings_form = SMTPSettingsForm()
@@ -426,11 +525,13 @@ def settings():
     if smtp_settings_form.validate_on_submit():
         user.email = smtp_settings_form.email.data
         user.smtp_server = smtp_settings_form.smtp_server.data
-        user.smtp_port = smtp_settings_form.smtp_port.data
+        user.smtp_port = (
+            smtp_settings_form.smtp_port.data
+        )  # Directly assign the integer value
         user.smtp_username = smtp_settings_form.smtp_username.data
         user.smtp_password = smtp_settings_form.smtp_password.data
         db.session.commit()
-        flash("👍 SMTP settings updated successfully")
+        flash("👍 SMTP settings updated successfully.")
         return redirect(url_for("settings"))
 
     # Handle PGP Key Form Submission
@@ -468,14 +569,21 @@ def settings():
             flash("👍 Username changed successfully.")
         return redirect(url_for("settings"))
 
-    # Prepopulate the form fields
+    # Prepopulate SMTP settings form fields and others
     smtp_settings_form.email.data = user.email
     smtp_settings_form.smtp_server.data = user.smtp_server
     smtp_settings_form.smtp_port.data = user.smtp_port
     smtp_settings_form.smtp_username.data = user.smtp_username
-    # Note: Password fields are typically not prepopulated for security reasons
-
     pgp_key_form.pgp_key.data = user.pgp_key
+
+    return render_template(
+        "settings.html",
+        user=user,
+        smtp_settings_form=smtp_settings_form,
+        change_password_form=change_password_form,
+        change_username_form=change_username_form,
+        pgp_key_form=pgp_key_form,
+    )
 
     return render_template(
         "settings.html",
