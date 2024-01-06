@@ -202,7 +202,6 @@ echo "✅ Automatic HTTPS certificates configured."
 ####################################
 
 cd $DOMAIN
-git switch ear
 
 mkdir -p ~/.gnupg
 chmod 700 ~/.gnupg
@@ -212,7 +211,7 @@ python3 -m venv venv
 source venv/bin/activate
 
 # Install Flask, Gunicorn, and other Python libraries
-pip install Flask pymysql python-dotenv gunicorn Flask-SQLAlchemy Flask-Bcrypt pyotp qrcode python-gnupg Flask-WTF cryptography
+pip install Flask pymysql python-dotenv gunicorn Flask-SQLAlchemy Flask-Bcrypt pyotp qrcode python-gnupg Flask-WTF cryptography email_validator
 
 SECRET_KEY=$(python3 -c 'import os; print(os.urandom(64).hex())')
 ENCRYPTION_KEY=$(python3 -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')
