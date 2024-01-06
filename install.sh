@@ -50,7 +50,7 @@ echo "Domain: $DOMAIN"
 sudo tee /etc/tor/torrc << EOL
 RunAsDaemon 1
 HiddenServiceDir /var/lib/tor/$DOMAIN/
-HiddenServicePort 80 127.0.0.1:5000
+HiddenServicePort 80 unix:/var/www/html/$DOMAIN/hushline-hosted.sock
 EOL
 
 # Restart Tor service
@@ -202,6 +202,7 @@ echo "✅ Automatic HTTPS certificates configured."
 ####################################
 
 cd $DOMAIN
+git switch ear
 
 mkdir -p ~/.gnupg
 chmod 700 ~/.gnupg
@@ -338,6 +339,9 @@ ufw limit ssh/tcp
 echo "y" | ufw enable
 
 echo "✅ UFW configuration complete."
+
+sudo chown debian-tor:www-data /var/www/html/ourdemo.app/hushline-hosted.sock
+sudo systemctl restart tor
 
 echo "
 ✅ Hush Line installation complete! Access your site at these addresses:
