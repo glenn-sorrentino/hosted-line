@@ -218,8 +218,8 @@ SECRET_KEY=$(python3 -c 'import os; print(os.urandom(64).hex())')
 ENCRYPTION_KEY=$(python3 -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')
 
 # Store in .env file
-echo "ENCRYPTION_KEY=$ENCRYPTION_KEY" >> .env
-echo "DB_NAME=$DB_NAME" > .env
+echo "ENCRYPTION_KEY=$ENCRYPTION_KEY" > .env   # Overwrite/create file for the first variable
+echo "DB_NAME=$DB_NAME" >> .env               # Append remaining variables
 echo "DB_USER=$DB_USER" >> .env
 echo "DB_PASS=$DB_PASS" >> .env
 echo "SECRET_KEY=$SECRET_KEY" >> .env
